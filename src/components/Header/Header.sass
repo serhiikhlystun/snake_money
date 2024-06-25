@@ -1,0 +1,101 @@
+@import "../../sass/abstracts/variables"
+@import "../../sass/abstracts/mixins"
+
+.header
+  font-family: $main-font
+  position: relative
+  width: 100%
+  &__wrapper
+    display: flex
+    align-items: center
+    justify-content: space-between
+    padding: 16px 0 0
+  &__avatar
+    max-width: 120px
+    width: 100%
+    border-radius: 100%
+    position: relative
+    z-index: 2
+    &-inn
+      display: flex
+      flex-direction: column
+      align-items: center
+      justify-content: center
+      max-width: 180px
+    &-wrapp
+      position: relative
+      z-index: 1
+      display: flex
+      align-items: center
+      justify-content: center
+      margin-bottom: 8px
+      max-width: 128px
+      &:before
+        content: url("./img/avatar-el-left.svg")
+        position: absolute
+        left: -24px
+        z-index: 0
+      &:after
+        content: url("./img/avatar-el-right.svg")
+        position: absolute
+        right: -24px
+        z-index: 0
+
+  &__coins
+    &-wrapp
+      display: flex
+      align-items: center
+      width: 100%
+      position: relative
+      z-index: 1
+      margin-top: 24px
+    &-value
+      color: $white
+      font-size: 60px
+      line-height: 60%
+      font-weight: 700
+      padding-right: 8px
+    &-img
+      max-width: 80px
+  &__summary
+    display: flex
+    justify-content: center
+    position: relative
+    &:before
+      content: url("../../app/pages/img/summ-bg.svg")
+      position: absolute
+      top: -10px
+      right: -16px
+    &-title
+      color: $white
+      font-size: 18px
+      line-height: 100%
+      font-weight: 600
+      padding-bottom: 8px
+      margin-top: 12px
+    &-rate
+      font-size: 70px
+      line-height: 60%
+      font-weight: 700
+      color: $white
+      &-wrapp
+        display: flex
+        position: relative
+        z-index: 1
+    &-img
+      max-width: 48px
+      object-fit: contain
+      height: max-content
+  &__username
+    background: url("./img/username-bg.svg") no-repeat center center
+    background-size: cover
+    font-size: 25px
+    line-height: 80%
+    padding: calc(10px + 3%) calc(16px + 1%)
+    color: #CD5D12
+    text-align: center
+    font-weight: 700
+    text-transform: uppercase
+    min-width: 180px
+  &__logo
+    margin-left: 14%

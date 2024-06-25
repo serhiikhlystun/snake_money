@@ -1,0 +1,12 @@
+@import "variables"
+
+@mixin textGradient($gradient)
+  display: inline-block
+  background: $gradient
+  -webkit-background-clip: text
+  -webkit-text-fill-color: transparent
+
+@mixin textShadow($borderWidth, $color)
+  text-shadow: -#{$borderWidth} 0 $color, 0 #{$borderWidth} $color, #{$borderWidth} 0 $color, 0 -#{$borderWidth} $color
+
+

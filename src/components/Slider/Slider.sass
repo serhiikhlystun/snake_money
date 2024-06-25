@@ -1,0 +1,54 @@
+@import "../../sass/abstracts/variables"
+
+.slider
+  display: flex
+  flex-direction: column
+  align-items: center
+  justify-content: center
+  position: relative
+  overflow: hidden
+  &__btn
+    width: 100%
+    height: auto
+    position: relative
+    z-index: 1
+    border: none
+    color: #9D4E13
+    background: none
+    cursor: pointer
+    margin-bottom: 24px
+    max-width: 340px
+    min-height: 130px
+    &:last-of-type
+      margin-bottom: 0
+    &:after
+      content: ''
+      background: url("/img/btn-bg.png") center center no-repeat
+      background-size: 100%
+      position: absolute
+      top: 0
+      left: 0
+      right: 0
+      bottom: 0
+      z-index: 0
+    &-text
+      font-size: 100px
+      z-index: 2
+      position: relative
+      line-height: 60%
+      display: flex
+      align-items: center
+      justify-content: center
+      margin-bottom: -16px
+      text-transform: uppercase
+    &:hover
+      filter: saturate(2)
+    &:active
+      filter: saturate(1)
+      transform: scale(0.99)
+  &__wrapp
+    display: flex
+    align-items: center
+    justify-content: center
+    max-width: 600px
+    width: 100%

@@ -1,0 +1,52 @@
+.sidebar
+  max-width: 200px
+  width: 100%
+  position: absolute
+  bottom: 24px
+  &.right
+    right: 24px
+    display: flex
+    flex-direction: column
+    align-items: flex-end
+  &__btn
+    width: 100%
+    height: auto
+    display: flex
+    align-items: center
+    justify-content: center
+    position: relative
+    z-index: 1
+    border: none
+    color: #9D4E13
+    background: none
+    min-height: 80px
+    cursor: pointer
+    margin-bottom: 24px
+    &:last-of-type
+      margin-bottom: 0
+    &:after
+      content: ''
+      background: url("/img/btn-bg.png") center center no-repeat
+      background-size: 100%
+      position: absolute
+      top: 0
+      left: 0
+      right: 0
+      bottom: 0
+      z-index: 0
+    &.square
+      width: 140px
+      height: 140px
+      &:after
+        background: url("/img/btn-bg-sq.png") center center no-repeat
+        background-size: 100%
+    & img, span
+      font-size: 30px
+      z-index: 2
+      position: relative
+    &:hover
+      filter: saturate(2)
+    &:active
+      filter: saturate(1)
+      transform: scale(0.99)
+

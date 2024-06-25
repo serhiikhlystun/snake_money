@@ -1,0 +1,43 @@
+@import "../../../sass/abstracts/variables"
+@import "../../../sass/abstracts/mixins"
+
+.avatar
+  position: relative
+  z-index: 100
+  display: flex
+  align-items: center
+  &__username
+    font-size: 50px
+    margin-right: 24px
+    text-align: center
+    color: #FFCF39
+    @include textShadow(2px, $purple)
+    letter-spacing: 0.06em
+    visibility: hidden
+    opacity: 0
+    transform: translateY(20%)
+    transition: 0.2s ease-out
+    &.active
+      transition: 0.2s ease-in-out
+      transition-delay: 0.1s
+      visibility: visible
+      opacity: 1
+      transform: translateY(0)
+  &__img
+    max-width: 120px
+    width: 100%
+    border: 3px solid $white
+    border-radius: 100%
+    filter: drop-shadow(0 0 20px #94631D)
+    cursor: pointer
+
+@media (max-width: $tablet)
+  .avatar
+    display: flex
+    align-items: center
+    justify-content: flex-end
+    &__img
+      max-width: 80px
+      border-width: 2px
+    &__username
+      font-size: 24px

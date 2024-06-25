@@ -1,0 +1,161 @@
+@import "../../sass/abstracts/variables"
+@import "../../sass/abstracts/mixins"
+
+.popup
+  &__bg
+    position: fixed
+    top: 0
+    left: 0
+    height: 100%
+    width: 100%
+    background: rgb(172 172 172 / 70%)
+    backdrop-filter: blur(6px)
+  &__wrapp
+    display: flex
+    align-items: center
+    justify-content: center
+    position: fixed
+    top: 0
+    left: 0
+    width: 100%
+    height: 100%
+    z-index: 100
+  &__content
+    position: relative
+    z-index: 2
+    padding: 24px
+    max-width: calc(580px + 16px)
+    width: 100%
+  &__close
+    &-btn
+      border: none
+      background: none
+      cursor: pointer
+      z-index: 1
+      &-wrapp
+        position: absolute
+        top: 32px
+        right: 32px
+        z-index: 100
+        & svg
+          & path
+            fill: #ffaa00
+  &__title
+    font-size: 50px
+    text-align: center
+    color: #FFCF39
+    @include textShadow(2px, $purple)
+    letter-spacing: 0.06em
+    padding-bottom: 40px
+    &-wrapp
+      width: 100%
+  &__subtitle
+    font-size: 16px
+    text-align: center
+    padding-bottom: 32px
+  &__input
+    width: 100%
+    height: 120px
+    display: flex
+    align-items: center
+    justify-content: center
+    position: relative
+    z-index: 1
+    transition: $transition
+    font-size: 25px
+    line-height: 140%
+    background: url("./img/input-bg.png") center center no-repeat
+    background-size: 100%
+    border: none
+    outline: none
+    padding: 0 40px
+    margin-bottom: 24px
+    &:last-of-type
+      margin-bottom: 0
+    &-title
+      @include textGradient(linear-gradient(90deg, $purple, #5D485B))
+    &-wrapp
+      padding-bottom: 56px
+      display: flex
+      flex-direction: column
+      max-width: 440px
+      margin: 0 auto
+    &-label
+      color: $purple
+      font-size: 25px
+      @include textShadow(1px, rgba(255, 255, 255, 0.35))
+  &__btn
+    max-width: 590px
+    width: 100%
+    filter: drop-shadow(5px 5px 10px #252421)
+    &:hover
+      filter: saturate(1.3) drop-shadow(5px 5px 12px #252421)
+  &__logo
+    width: 100%
+    max-width: 150px
+    &-box
+      position: absolute
+      bottom: 32px
+      right: 32px
+  &__save
+    &-btn
+      display: flex
+      justify-content: center
+      align-items: center
+      width: 100%
+      cursor: pointer
+      &:hover
+        filter: saturate(1.3)
+      & img
+        width: 100%
+        max-width: 320px
+
+@media (max-width: $mobile)
+  .popup
+    &__input
+      height: 10.5vh
+      margin-bottom: 8px
+      &-label
+        font-size: 16px
+      &-wrapp
+        padding-bottom: 32px
+    &__title
+      font-size: 32px
+    &__content
+      height: 100vh
+      display: flex
+      flex-direction: column
+      align-items: center
+      justify-content: flex-start
+    &__close
+      &-btn
+        &-wrapp
+          position: absolute
+          top: 20px
+          right: 16px
+    &__save
+      &-btn
+        & img
+          max-width: 220px
+
+@media (max-width: 375px)
+  .popup
+    &__input
+      height: 13vh
+
+
+@media (max-width: 940px) and (orientation: landscape)
+  .popup
+    &__wrapp
+      align-items: flex-start
+      overflow: scroll
+      padding: 40px 24px
+    &__logo
+      &-box
+        display: none
+    &__input
+      height: 88px
+      &-wrapp
+        max-width: 320px
+
+
