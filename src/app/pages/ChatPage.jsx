@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 import Header from '../components/Header/Header';
 import ProfilePopup from "../components/Popups/ProfilePopup";
@@ -25,7 +26,7 @@ const ChatPage = () => {
                     </div>
                 </div>
                 <div className="chat__logo-wrapp">
-                    <img src={chatLogo} alt="" className="chat__logo"/>
+                    <Image src={chatLogo} alt="" className="chat__logo"/>
                 </div>
             </div>
         </div>);

@@ -11,8 +11,10 @@
   "dependencies": {
     "date-fns": "^3.6.0",
     "next": "14.2.4",
+    "next-auth": "^4.24.7",
     "react": "^18",
     "react-dom": "^18",
+    "react-query": "^3.39.3",
     "sass": "^1.77.6",
     "sass-loader": "^14.1.1",
     "swiper": "^11.1.3"
