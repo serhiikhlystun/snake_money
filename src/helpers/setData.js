@@ -19,7 +19,7 @@ const setData = async (mutation, data = {}, additionalPath = '', token) => {
   });
 
   const responseJson = await response.json();
-  return responseJson.data;
+  return responseJson;
 };
 
 export default setData;

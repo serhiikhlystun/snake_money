@@ -7,15 +7,15 @@ import { createNewUser } from "@/app/queries/users";
 import ShowPasswordIcon from "./img/show-password.svg";
 import HidePassword from "./img/hide-password.svg";
 
-const RegPopup = ({ isOpen, onClose }) => {
-  const content = {
-    title: "Registration",
-    username: "Username",
-    email: "Email",
-    password: "Password",
-    btnText: "Go",
-  };
+const content = {
+  title: "Registration",
+  username: "Username",
+  email: "Email",
+  password: "Password",
+  btnText: "Go",
+};
 
+const RegPopup = ({ isOpen, onClose }) => {
   const [error, setError] = useState("");
   const [isShowPassword, setIsShowPassword] = useState(false);
 
@@ -38,17 +38,18 @@ const RegPopup = ({ isOpen, onClose }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // if (e.target.password.value !== e.target.repeat_password.value) {
-    //   setError("Passwords doesn't match");
-    //   return;
-    // } else setError('');
     signUpMutation.mutate({
       first_name: e.target.username.value,
       email: e.target.email.value,
       password: e.target.password.value,
-      // role: "fb9d7c40-ab48-442e-a51b-b5ce9a490e56",
+      role: "fb9d7c40-ab48-442e-a51b-b5ce9a490e56",
       status: "active",
     });
+  };
+
+  const handleClose = () => {
+    onClose();
+    setError("");
   };
 
   if (!isOpen) return null;
@@ -58,7 +59,7 @@ const RegPopup = ({ isOpen, onClose }) => {
       <div className="frame-popup__content">
         <button
           className="frame-popup__btn-close"
-          onClick={onClose}
+          onClick={handleClose}
         ></button>
         <h4 className="frame-popup__title top">{content.title}</h4>
         <form
@@ -71,6 +72,8 @@ const RegPopup = ({ isOpen, onClose }) => {
               type="text"
               placeholder={content.username}
               name="username"
+              autoComplete="username"
+              required
             />
           </div>
           <div className="frame-popup__input-box">
@@ -79,6 +82,8 @@ const RegPopup = ({ isOpen, onClose }) => {
               type="email"
               placeholder={content.email}
               name="email"
+              autoComplete="email"
+              required
             />
           </div>
           <div className="frame-popup__input-box">
@@ -106,8 +111,10 @@ const RegPopup = ({ isOpen, onClose }) => {
               type={isShowPassword ? "text" : "password"}
               placeholder={content.password}
               name="password"
+              required
             />
           </div>
+          {error ? <div>{error}</div> : null}
           <button type="submit" className="frame-popup__btn smller">
             <span className="frame-popup__btn-text">
               {content.btnText}

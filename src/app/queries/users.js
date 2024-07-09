@@ -12,11 +12,8 @@ export const getCurrentUser = `
             id
             email
             first_name
-            last_name
-            location
-            phone
-            session {
-                id
+            avatar {
+              id
             }
         }
     }
@@ -29,9 +26,10 @@ export const updateCurrentUser = `
             id
             email
             first_name
-            last_name
-            location
-            phone
+            avatar {
+              id
+            }
+
         }
     }
 `;
@@ -67,3 +65,28 @@ export const updateUserSession = `
         }
     }
 `;
+
+export const getUserData = `
+    query User_data ($user_id: String) {
+        user_data(filter: { user: { id: { _eq: $user_id } }}) {
+            balance
+            best_score
+            user {
+                id
+            }
+        }
+    }
+`;
+
+export const createUserData = `
+    mutation Create_user_data_item ($user_id: ID) {
+        create_user_data_item(data: { user: { id: $user_id} }) {
+            best_score
+            balance
+            user {
+                id
+            }
+        }
+}
+`;
+

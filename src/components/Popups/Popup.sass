@@ -144,6 +144,10 @@ $radius: 25px
     position: relative
     width: 100%
 
+    &:-webkit-autofill
+      -webkit-box-shadow: 0 0 0px 1000px #F08B00 inset !important
+      -webkit-text-fill-color: #FFF !important
+
     &::placeholder
       color: $white
       opacity: 0.4
@@ -196,6 +200,10 @@ $radius: 25px
       line-height: 100%
       text-align: left
       width: 100%
+      display: block
+    
+    &-file 
+      display: none
 
   &__profile
     max-width: 567px
@@ -203,10 +211,15 @@ $radius: 25px
     margin: 0 auto
     display: grid
     grid-template-columns: 1fr 1fr
+    grid-template-rows: auto auto
     grid-column-gap: 16px
 
     &.column
-      grid-template-columns: 1fr
+      grid-column: 1 / 3
+      grid-row: 2 / 3
+      display: flex
+      flex-wrap: wrap
+      justify-content: center
 
     &-title
       font-size: 30px
@@ -234,6 +247,9 @@ $radius: 25px
       height: auto
       position: relative
       z-index: 1
+      display: flex
+      align-items: center
+      justify-content: center
       border: none
       color: #9D4E13
       background: none
@@ -270,10 +286,7 @@ $radius: 25px
         z-index: 2
         position: relative
         line-height: 30%
-        display: flex
-        align-items: center
-        justify-content: center
-        margin-bottom: -16px
+        margin-bottom: -8px
         text-transform: capitalize
 
       &:hover

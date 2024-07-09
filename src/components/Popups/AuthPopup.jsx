@@ -1,5 +1,6 @@
 import React from 'react';
 import "./Popup.sass";
+import Link from 'next/link';
 
 const AuthPopup = ({ isOpen, onLoginClick, onRegClick, onClose }) => {
     const content = {
@@ -11,9 +12,11 @@ const AuthPopup = ({ isOpen, onLoginClick, onRegClick, onClose }) => {
 
     const handleLoginClick = () => {
         onLoginClick();
+        onClose();
     };
     const handleRegClick = () => {
         onRegClick();
+        onClose();
     };
 
     const handleClose = () => {
@@ -36,9 +39,11 @@ const AuthPopup = ({ isOpen, onLoginClick, onRegClick, onClose }) => {
                     </button>
                 </div>
                 <div className="frame-popup__btn-wrapper">
-                    <button className="frame-popup__btn smller">
+                    <Link href={'https://demo.snakemoneygame.com/?color=21'} className="frame-popup__btn smller">
+                    <button className="frame-popup__btn">
                         <span className="frame-popup__btn-text">{content.demo}</span>
                     </button>
+                    </Link>
                 </div>
             </div>
         </div>

@@ -16,6 +16,7 @@ import AboutPopup from "./../components/Popups/AboutPopup";
 import WhitepaperPopup from "./../components/Popups/WhitepaperPopup";
 import ReferralsPopup from "./../components/Popups/ReferralsPopup";
 import ChatPopup from "./../components/Popups/ChatPopup";
+import AuthPopup from "@/components/Popups/AuthPopup";
 
 import fixIcon from "/public/img/fix.svg";
 import chatIcon from "/public/img/chat.svg";
@@ -25,6 +26,13 @@ import icon03 from "/public/img/icon03.jpg";
 import icon04 from "/public/img/icon04.jpg";
 import icon05 from "/public/img/icon05.jpg";
 import icon06 from "/public/img/icon06.jpg";
+
+import { useSession } from "next-auth/react";
+import { useQuery, useMutation } from "react-query";
+import { getCurrentUser, getUserData, createUserData, updateCurrentUser } from "./queries/users";
+import fetchData from "@/helpers/fetchData";
+import getData from "./queries/getData";
+import setData from "@/helpers/setData";
 
 function App() {
   const [isPortrait, setIsPortrait] = useState(window.innerWidth < 900);
@@ -36,6 +44,53 @@ function App() {
   const [settingsPopupOpen, setSettingsPopupOpen] = useState(false);
   const [referralsPopupOpen, setReferralsPopupOpen] = useState(false);
   const [chatPopupOpen, setChatPopupOpen] = useState(false);
+  const [authPopupOpen, setAuthPopupOpen] = useState(false);
+  const [updatedUserInfo, setUpdatedUserInfo] = useState({});
+  const [userAvatar, setUserAvatar] = useState("");
+
+  const { data: session, status } = useSession();
+
+  const { data: user, isSuccess: isUserSuccess } = useQuery(
+    ["currentUser"],
+    async () => await fetchData(getCurrentUser, {}, "/system", session.user.accessToken),
+    {
+      enabled: status === "authenticated",
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: userData, isSuccess: isUserDataSucces } = useQuery(
+    "userData",
+    async () => await getData(getUserData, "user_data", { user_id: user.id }, session.user.accessToken),
+    {
+      enabled: isUserSuccess,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const createUserDataMutation = useMutation(
+    "createUserData",
+    async () => await setData(createUserData, { user_id: user.id })
+  );
+
+  const updateUserMutation = useMutation((updatedUser) => {
+    status === "authenticated" &&
+      setData(updateCurrentUser, { data: updatedUser }, "/system", session.user.accessToken);
+  });
+
+  const handleUpdate = (e) => {
+    e.preventDefault();
+    updateUserMutation.mutate({
+      email: e.target.email.value ? e.target.email.value : user.email,
+      first_name: e.target.username.value ? e.target.username.value : user.first_name,
+    });
+  };
+
+  useEffect(() => {
+    if (userData && !userData.length) {
+      createUserDataMutation.mutate(user.id);
+    }
+  }, [userData]);
 
   const openStartPopup = () => {
     setStartPopupOpen(true);
@@ -61,6 +116,9 @@ function App() {
   const openChatPopup = () => {
     setChatPopupOpen(true);
   };
+  const openAuthPopup = () => {
+    setAuthPopupOpen(true);
+  };
 
   const closePopups = () => {
     setStartPopupOpen(false);
@@ -71,6 +129,18 @@ function App() {
     setWhitepaperPopupOpen(false);
     setReferralsPopupOpen(false);
     setChatPopupOpen(false);
+    setAuthPopupOpen(false);
+  };
+
+  const handleUpdateUserInfo = (email, username) => {
+    setUpdatedUserInfo({
+      email: email,
+      username: username,
+    });
+  };
+
+  const handleUpdateUserAvatar = (img) => {
+    setUserAvatar(img);
   };
 
   const sidebarContentLeft = [
@@ -79,7 +149,7 @@ function App() {
     {
       content: <Image src={fixIcon} alt="fix icon" />,
       className: "square",
-      onClick: openSettingsPopup,
+      onClick: session ? openSettingsPopup : openAuthPopup,
     },
   ];
 
@@ -246,13 +316,19 @@ function App() {
       {isPortrait && <RotateMessage />}
       <div className="homepage">
         <div className="container">
-          <Header />
+          <Header
+            user={user}
+            updatedUserAvatar={userAvatar}
+            updatedUserInfo={updatedUserInfo}
+            userData={isUserDataSucces ? userData[0] : null}
+          />
           <SideBar content={sidebarContentLeft} sideClass="left" />
           <Slider
             openStartPopup={openStartPopup}
             closePopups={closePopups}
             openLoginPopup={openLoginPopup}
             openRegPopup={openRegPopup}
+            session={session}
           />
           <SideBar content={sidebarContentRight} sideClass="right" />
         </div>
@@ -260,22 +336,28 @@ function App() {
       <LoginPopup isOpen={loginPopupOpen} onClose={closePopups} />
       <RegPopup isOpen={regPopupOpen} onClose={closePopups} />
       <StartPopup isOpen={startPopupOpen} onClose={closePopups} />
-      <SettingsPopup isOpen={settingsPopupOpen} onClose={closePopups} />
+      <SettingsPopup
+        isOpen={settingsPopupOpen}
+        onClose={closePopups}
+        user={user}
+        handleUpdate={handleUpdate}
+        handleUpdateUserInfo={handleUpdateUserInfo}
+        updatedUserInfo={updatedUserInfo}
+        handleUpdateUserAvatar={handleUpdateUserAvatar}
+        token={session?.user.accessToken}
+      />
+      <AuthPopup
+        isOpen={authPopupOpen}
+        onClose={() => {
+          setAuthPopupOpen(false);
+        }}
+        onLoginClick={openLoginPopup}
+        onRegClick={openRegPopup}
+      />
       <AboutPopup isOpen={aboutPopupOpen} onClose={closePopups} />
-      <WhitepaperPopup
-        isOpen={whitepaperPopupOpen}
-        onClose={closePopups}
-      />
-      <ReferralsPopup
-        isOpen={referralsPopupOpen}
-        onClose={closePopups}
-      />
-      <ChatPopup
-        isOpen={chatPopupOpen}
-        onClose={closePopups}
-        groups={groups}
-        people={people}
-      />
+      <WhitepaperPopup isOpen={whitepaperPopupOpen} onClose={closePopups} />
+      <ReferralsPopup isOpen={referralsPopupOpen} onClose={closePopups} />
+      <ChatPopup isOpen={chatPopupOpen} onClose={closePopups} groups={groups} people={people} />
     </>
   );
 }
