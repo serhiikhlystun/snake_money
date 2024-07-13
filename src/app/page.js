@@ -34,6 +34,8 @@ import fetchData from "@/helpers/fetchData";
 import getData from "./queries/getData";
 import setData from "@/helpers/setData";
 
+const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
+
 function App() {
   const [isPortrait, setIsPortrait] = useState(window.innerWidth < 900);
   const [regPopupOpen, setRegPopupOpen] = useState(false);
@@ -50,6 +52,7 @@ function App() {
 
   const { data: session, status } = useSession();
 
+  // Query for getting current user's system info
   const { data: user, isSuccess: isUserSuccess } = useQuery(
     ["currentUser"],
     async () => await fetchData(getCurrentUser, {}, "/system", session.user.accessToken),
@@ -59,6 +62,7 @@ function App() {
     }
   );
 
+  // Query for getting current user's game account data
   const { data: userData, isSuccess: isUserDataSucces } = useQuery(
     "userData",
     async () => await getData(getUserData, "user_data", { user_id: user.id }, session.user.accessToken),
@@ -68,11 +72,13 @@ function App() {
     }
   );
 
+  // Create current user's game account data
   const createUserDataMutation = useMutation(
     "createUserData",
     async () => await setData(createUserData, { user_id: user.id })
   );
 
+  // Update user's system info
   const updateUserMutation = useMutation((updatedUser) => {
     status === "authenticated" &&
       setData(updateCurrentUser, { data: updatedUser }, "/system", session.user.accessToken);
@@ -84,13 +90,20 @@ function App() {
       email: e.target.email.value ? e.target.email.value : user.email,
       first_name: e.target.username.value ? e.target.username.value : user.first_name,
     });
+    setUpdatedUserInfo({
+      email: e.target.email.value ? e.target.email.value : user.email,
+      username: e.target.username.value ? e.target.username.value : user.first_name,
+    });
   };
 
   useEffect(() => {
     if (userData && !userData.length) {
       createUserDataMutation.mutate(user.id);
     }
-  }, [userData]);
+    if (user) {
+      setUpdatedUserInfo({ email: user.email, username: user.first_name });
+    }
+  }, [userData, user]);
 
   const openStartPopup = () => {
     setStartPopupOpen(true);
@@ -132,13 +145,7 @@ function App() {
     setAuthPopupOpen(false);
   };
 
-  const handleUpdateUserInfo = (email, username) => {
-    setUpdatedUserInfo({
-      email: email,
-      username: username,
-    });
-  };
-
+  // Update user's avatar in the Header
   const handleUpdateUserAvatar = (img) => {
     setUserAvatar(img);
   };
@@ -159,7 +166,7 @@ function App() {
     {
       content: <Image src={chatIcon} alt="chat icon" />,
       className: "square",
-      onClick: openChatPopup,
+      onClick: session ? openChatPopup: openAuthPopup,
     },
   ];
 
@@ -341,10 +348,10 @@ function App() {
         onClose={closePopups}
         user={user}
         handleUpdate={handleUpdate}
-        handleUpdateUserInfo={handleUpdateUserInfo}
         updatedUserInfo={updatedUserInfo}
         handleUpdateUserAvatar={handleUpdateUserAvatar}
         token={session?.user.accessToken}
+        userAvatar={userAvatar}
       />
       <AuthPopup
         isOpen={authPopupOpen}
@@ -357,7 +364,15 @@ function App() {
       <AboutPopup isOpen={aboutPopupOpen} onClose={closePopups} />
       <WhitepaperPopup isOpen={whitepaperPopupOpen} onClose={closePopups} />
       <ReferralsPopup isOpen={referralsPopupOpen} onClose={closePopups} />
-      <ChatPopup isOpen={chatPopupOpen} onClose={closePopups} groups={groups} people={people} />
+      {session ?
+      <ChatPopup
+        isOpen={chatPopupOpen}
+        onClose={closePopups}
+        groups={groups}
+        people={people}
+        token={session.user.accessToken}
+      /> : null
+      }
     </>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import "./Popup.sass";
 import avatar from "../Header/img/avatar.jpg";
@@ -7,27 +7,25 @@ import { updateCurrentUser } from "@/app/queries/users";
 import setData from "@/helpers/setData";
 
 const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
-const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
+const apiUrl = process.env.NEXT_PUBLIC_REST_API;
 
 const SettingsPopup = ({
   isOpen,
   onClose,
   user,
   handleUpdate,
-  handleUpdateUserInfo,
   updatedUserInfo,
   handleUpdateUserAvatar,
   token
 }) => {
   const [imageSrc, setImageSrc] = useState("");
-  const [file, setFile] = useState(null);
   const queryClient = useQueryClient();
 
   const userAvatar = user && user.avatar ? user.avatar.id : null;
 
+  // Upload file from the input field and update an avatar
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
-    setFile(selectedFile);
     if (selectedFile) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -35,15 +33,9 @@ const SettingsPopup = ({
         handleUpdateUserAvatar(e.target.result);
       };
       reader.readAsDataURL(selectedFile);
+      handleUpload(selectedFile)
     }
-    handleUpload()
   };
-
-  useEffect(() => {
-    if (user) {
-      handleUpdateUserInfo(user.email, user.first_name);
-    }
-  }, [user]);
 
   const content = {
     title: "Account",
@@ -59,31 +51,49 @@ const SettingsPopup = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     handleUpdate(e);
-    handleUpdateUserInfo(e.target.email.value, e.target.username.value);
   };
 
+  // Request for upload image to the server
   const uploadImage = async (file) => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append('file', file);
 
     const response = await fetch(`${apiUrl}/files`, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${token}`,
+        'Authorization': `Bearer ${token}`
       },
-      body: formData,
+      body: formData
     });
 
     if (!response.ok) {
-      throw new Error("Error uploading file");
+      throw new Error('Error uploading file');
     }
 
     const data = await response.json();
     return data.data.id;
   };
 
-  const mutation = useMutation(uploadImage, {
+  // Request for update user avatar from uploaded image
+  const updateUserAvatar = async (fileId) => {
+    const response = await fetch(`${apiUrl}/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ avatar: fileId })
+    });
+
+    if (!response.ok) {
+      throw new Error('Error updating user avatar');
+    }
+  };
+
+  // Mutation for upload and update user's avatar
+  const updateAvatarMutation = useMutation(uploadImage, {
     onSuccess: async (fileId) => {
+      await updateUserAvatar(fileId);
       queryClient.invalidateQueries('user');
       alert('Avatar updated successfully!');
     },
@@ -93,12 +103,14 @@ const SettingsPopup = ({
     }
   });
 
-  const handleUpload = () => {
+  // Call the mutation for update user's avatar
+  const handleUpload = (file) => {
     if (file) {
-      mutation.mutate(file);
+      updateAvatarMutation.mutate(file);
     }
   };
 
+  // Mutation for change user's password
   const updatePasswordMutation = useMutation(updatedUser => {
       setData(updateCurrentUser, { data: updatedUser }, '/system', token);
     },{
@@ -106,6 +118,7 @@ const SettingsPopup = ({
     }
   )
 
+  // Call mutation for change user's password
   const handleUpdatePassword = (e) => {
     e.preventDefault();
     if(e.target.password.value === e.target.repeat_password.value){

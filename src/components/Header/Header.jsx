@@ -73,7 +73,7 @@ const Header = ({ user, userData, updatedUserInfo, updatedUserAvatar }) => {
       </div>
       {user ? (
         <button className="frame-popup__btn smller" onClick={signOut}>
-          Logout
+          <span className="frame-popup__btn-text">Logout</span>
         </button>
       ) : null}
     </header>

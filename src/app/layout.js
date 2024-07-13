@@ -13,7 +13,7 @@ export default function RootLayout({ children }) {
           <head>
             <meta
               name="viewport"
-              content="width=device-width, user-scalable=no"
+              content="width=device-width, initial-scale=0.5"
             />
             <title>SnakeMoney</title>
             <link rel="icon" href={favicon.src} />

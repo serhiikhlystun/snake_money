@@ -24,14 +24,17 @@
       flex-direction: column
       align-items: center
       justify-content: center
-      max-width: 180px
+      width: 33.3%
+      margin-right: auto
     &-wrapp
       position: relative
       z-index: 1
       display: flex
       align-items: center
       justify-content: center
+      align-self: start 
       margin-bottom: 8px
+      margin-left: 30px
       max-width: 128px
       &:before
         content: url("./img/avatar-el-left.svg")
@@ -48,7 +51,6 @@
     &-wrapp
       display: flex
       align-items: center
-      width: 100%
       position: relative
       z-index: 1
       margin-top: 24px
@@ -62,8 +64,10 @@
       max-width: 80px
   &__summary
     display: flex
-    justify-content: center
+    justify-content: right
     position: relative
+    margin-left: auto
+    width: 33.3%
     &:before
       content: url("../../app/pages/img/summ-bg.svg")
       position: absolute
@@ -100,7 +104,8 @@
     font-weight: 700
     text-transform: uppercase
     min-width: 180px
+    &-wrapp
+      align-self: start
   &__logo
-    margin-left: 14%
     &.no_user
       margin-left: 0
