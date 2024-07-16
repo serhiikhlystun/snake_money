@@ -1,31 +1,23 @@
-"use client";
-import { SessionProvider } from "next-auth/react";
-import { QueryClientProvider, QueryClient } from "react-query";
-import favicon from './../../public/img/favicon.png';
+import favicon from "./../../public/img/favicon.png";
+import ProvidersLayout from "@/components/providers/providersLayout";
 
-const queryClient = new QueryClient();
+export const viewport = {
+  width: 'device-width',
+  initialScale: 0.5,
+};
 
 export default function RootLayout({ children }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider>
-        <html className="" lang="en">
-          <head>
-            <meta
-              name="viewport"
-              content="width=device-width, initial-scale=0.5"
-            />
-            <title>SnakeMoney</title>
-            <link rel="icon" href={favicon.src} />
-          </head>
-          <body
-            className="App"
-            style={{ fontFamily: "Ravi Prakash, system-ui" }}
-          >
-            {children}
-          </body>
-        </html>
-      </SessionProvider>
-    </QueryClientProvider>
+    <html lang="eu">
+      <head>
+        <link rel="icon" href={favicon.src} />
+        <title>SnakeMoney</title>
+      </head>
+      <ProvidersLayout>
+        <body className="App" style={{ fontFamily: "Ravi Prakash, system-ui" }}>
+          {children}
+        </body>
+      </ProvidersLayout>
+    </html>
   );
 }

@@ -1,7 +1,7 @@
 import fetchData from "@/helpers/fetchData";
 
 const getData = async (query, dataName, variables = {}, token) => {
-    let data = '';
+  let data = "";
   if (token) {
     data = await fetchData(
       query,

@@ -34,8 +34,6 @@ import fetchData from "@/helpers/fetchData";
 import getData from "./queries/getData";
 import setData from "@/helpers/setData";
 
-const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
-
 function App() {
   const [isPortrait, setIsPortrait] = useState(window.innerWidth < 900);
   const [regPopupOpen, setRegPopupOpen] = useState(false);
@@ -371,6 +369,7 @@ function App() {
         groups={groups}
         people={people}
         token={session.user.accessToken}
+        user={user}
       /> : null
       }
     </>

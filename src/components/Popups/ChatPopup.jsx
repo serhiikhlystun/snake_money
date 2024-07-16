@@ -2,8 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import "./Popup.sass";
 import { format } from "date-fns";
-import { createDirectus, realtime, staticToken } from "@directus/sdk";
-import { useSession } from "next-auth/react";
+import { createClient } from "graphql-ws";
+import { subscription, createMessage, getUserChats } from "@/app/queries/chatQueries";
+import { useMutation, useQuery } from "react-query";
+import setData from "@/helpers/setData";
+import getData from "@/app/queries/getData";
 
 import icon05 from "/public/img/icon05.jpg";
 import cash from "/public/img/cash.svg";
@@ -12,49 +15,73 @@ import emoji from "/public/img/emoji.svg";
 import att from "/public/img/att.svg";
 import playIcon from "/public/img/playIcon.png";
 
-const apiUrl = process.env.NEXT_PUBLIC_REST_API;
+const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
 
-const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
+const ChatPopup = ({ isOpen, onClose, token, user }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [people, setPeople] = useState([]);
   const messagesEndRef = useRef(null);
-
-  const client = createDirectus(apiUrl).with(staticToken(token)).with(realtime());
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const client = createClient({
+    url: apiUrl,
+    keepAlive: 30000,
+    connectionParams: async () => {
+      return { access_token: token };
+    },
+  });
+
+  const { data: userChats, isSuccess: isUserChatsSuccess } = useQuery(
+    "chats",
+    async () => await getData(getUserChats, "chat_participants", { userId: user.id }, token),
+    {
+      enabled: !!user,
+      refetchOnWindowFocus: false,
+    }
+  );
+
   useEffect(() => {
-    const cleanup = client.onWebSocket("message", function (data) {
-      if (data.type == "auth" && data.status == "ok") {
-        subscribe("create");
-      }
-    });
+    if (isUserChatsSuccess) {
+      userChats.forEach(async (item) => {
+        if (item.chat_id.type === "one_to_one") {
+          setPeople((people) => {
+            let newPeople = [...people, item.chat_id];
+            return newPeople;
+          });
+        } else {
+          setGroups((groups) => {
+            let newGroups = [...groups, item.chat_id];
+            return newGroups;
+          });
+          console.log(groups);
+        }
+      });
+    }
+  }, [userChats, isUserChatsSuccess]);
 
-    client.connect();
+  const createMessageMutation = useMutation((content) => {
+    setData(createMessage, { data: content }, "", token);
+  });
 
-    return cleanup;
-  }, []);
-
-  async function subscribe(event) {
-    const { subscription } = await client.subscribe("chat", {
-      event,
-      query: {
-        fields: ["*", "user_created.first_name"],
+  client.subscribe(
+    {
+      query: subscription,
+    },
+    {
+      next: ({ data }) => {
+        console.log(data);
       },
-    });
-
-    for await (const message of subscription) {
-      receiveMessage(message);
+      error: (err) => {
+        console.log(err);
+      },
+      complete: () => {},
     }
-  }
-
-  function receiveMessage(data) {
-    if (data.type == "subscription" && data.event == "init") {
-      console.log("subscription started");
-    }
-  }
+  );
 
   useEffect(() => {
     scrollToBottom();
@@ -70,6 +97,7 @@ const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
         time: format(new Date(), "eeee, h:mmaaa"),
       };
       setMessages([...messages, userMessage]);
+      createMessageMutation.mutate(input);
       setInput("");
       handleBotResponse(userMessage.text);
     }
@@ -118,16 +146,16 @@ const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
                     className="chat-popup__users-item-img"
                     width={40}
                     height={40}
-                    src={group.img}
+                    src={group.chat_icon}
                     alt={group.name}
                   />
                   <div className="chat-popup__users-item-wrapp">
                     <div className="chat-popup__users-item-box">
-                      <h5 className="chat-popup__users-item-username">{group.name}</h5>
-                      <p className="chat-popup__users-item-text">{group.text}</p>
+                      <h5 className="chat-popup__users-item-username">{group.chat_name}</h5>
+                      <p className="chat-popup__users-item-text">{group.last_message}</p>
                     </div>
                     <div className="chat-popup__users-item-box rightAlign">
-                      <p className="chat-popup__users-item-time">{group.time}</p>
+                      <p className="chat-popup__users-item-time">{format(group.date_updated, "eeee, h:mmaaa")}</p>
                       <p
                         className={`chat-popup__users-item-time-checked ${
                           group.messageCount !== 0 ? "unread" : ""
@@ -150,16 +178,16 @@ const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
                     className="chat-popup__users-item-img"
                     width={40}
                     height={40}
-                    src={person.img}
+                    src={person.chat_icon}
                     alt={person.name}
                   />
                   <div className="chat-popup__users-item-wrapp">
                     <div className="chat-popup__users-item-box">
-                      <h5 className="chat-popup__users-item-username">{person.name}</h5>
-                      <p className="chat-popup__users-item-text">{person.text}</p>
+                      <h5 className="chat-popup__users-item-username">{person.chat_name}</h5>
+                      <p className="chat-popup__users-item-text">{person.last_message}</p>
                     </div>
                     <div className="chat-popup__users-item-box rightAlign">
-                      <p className="chat-popup__users-item-time">{person.time}</p>
+                      <p className="chat-popup__users-item-time">{format(person.date_updated, "eeee, h:mmaaa")}</p>
                       <p
                         className={`chat-popup__users-item-time-checked ${
                           person.messageCount !== 0 ? "unread" : ""
@@ -197,7 +225,7 @@ const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
             ))}
             <div ref={messagesEndRef} />
           </div>
-          <form onSubmit={handleSendMessage} className="chat-popup__chat-input-inner">
+          <div className="chat-popup__chat-input-inner">
             <div className="chat-popup__chat-input-container">
               <input
                 type="text"
@@ -218,10 +246,10 @@ const ChatPopup = ({ isOpen, onClose, groups, people, token }) => {
                 </div>
               </div>
             </div>
-            <button type="submit" className="chat-popup__chat-send-button">
+            <button type="button" onClick={handleSendMessage} className="chat-popup__chat-send-button">
               <Image src={playIcon} width={32} height={40} alt="" />
             </button>
-          </form>
+          </div>
         </div>
       </div>
     </div>

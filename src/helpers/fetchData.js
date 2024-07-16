@@ -1,7 +1,6 @@
 const graphQLAPI = process.env.NEXT_PUBLIC_GRAPHQL;
 
 const fetchData = async (query, { variables = {} }, additionalPath = '', token) => {
-
   let headers = { 'Content-Type': 'application/json' };
   if (token) {
     headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
