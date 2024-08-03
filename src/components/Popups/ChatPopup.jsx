@@ -3,19 +3,46 @@ import Image from "next/image";
 import "./Popup.sass";
 import { format } from "date-fns";
 import { createClient } from "graphql-ws";
-import { subscription, createMessage, getUserChats } from "@/app/queries/chatQueries";
+import {
+  messagesSubscription,
+  chatsSubscription,
+  createMessage,
+  getUserChat,
+  getGroupChats,
+  getUsers,
+  getChatUsersMessages,
+  createChatParticipants,
+  createChat,
+  createOneToOneChatParticipants,
+  getSearchedUsers,
+  update_last_message,
+} from "@/app/queries/chatQueries";
 import { useMutation, useQuery } from "react-query";
 import setData from "@/helpers/setData";
+import fetchData from "@/helpers/fetchData";
 import getData from "@/app/queries/getData";
 
-import icon05 from "/public/img/icon05.jpg";
 import cash from "/public/img/cash.svg";
 import cam from "/public/img/cam.svg";
 import emoji from "/public/img/emoji.svg";
 import att from "/public/img/att.svg";
 import playIcon from "/public/img/playIcon.png";
+import favicon from "./../../../public/img/favicon.png";
 
 const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
+const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
+
+async function handleUsersFiltering({ queryKey }) {
+  let variables = {};
+  if (queryKey[1]) {
+    variables = {
+      value: queryKey[1],
+    };
+    return await fetchData(getSearchedUsers, { variables }, "/system", queryKey[2]);
+  }
+  variables = { userId: queryKey[3] };
+  return await fetchData(getUsers, { variables }, "/system", queryKey[2]);
+}
 
 const ChatPopup = ({ isOpen, onClose, token, user }) => {
   const [messages, setMessages] = useState([]);
@@ -23,6 +50,12 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
   const [groups, setGroups] = useState([]);
   const [people, setPeople] = useState([]);
   const messagesEndRef = useRef(null);
+  const [selectedChat, setSelectedChat] = useState();
+  const [activeChat, setActiveChat] = useState(null);
+  const [newChatId, setNewChatId] = useState("");
+  const [inputSearchValue, setInputSearchValue] = useState("");
+  const [receivedMessage, setReceivedMessage] = useState();
+  const [lastMessage, setLastMessage] = useState("");
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,44 +69,89 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     },
   });
 
-  const { data: userChats, isSuccess: isUserChatsSuccess } = useQuery(
-    "chats",
-    async () => await getData(getUserChats, "chat_participants", { userId: user.id }, token),
+  // Queries
+  const { data: users, isSuccess: isUsersSuccess } = useQuery(
+    ["users", inputSearchValue, token, user?.id],
+    handleUsersFiltering,
     {
-      enabled: !!user,
       refetchOnWindowFocus: false,
     }
   );
 
-  useEffect(() => {
-    if (isUserChatsSuccess) {
-      userChats.forEach(async (item) => {
-        if (item.chat_id.type === "one_to_one") {
-          setPeople((people) => {
-            let newPeople = [...people, item.chat_id];
-            return newPeople;
-          });
-        } else {
-          setGroups((groups) => {
-            let newGroups = [...groups, item.chat_id];
-            return newGroups;
-          });
-          console.log(groups);
-        }
-      });
+  const { data: groupChats, isSuccess: isGroupChatsSuccess } = useQuery(
+    "chats",
+    async () => await getData(getGroupChats, "chats", {}, token),
+    {
+      refetchOnWindowFocus: false,
     }
-  }, [userChats, isUserChatsSuccess]);
+  );
 
-  const createMessageMutation = useMutation((content) => {
-    setData(createMessage, { data: content }, "", token);
+  // Mutations
+  const createMessageMutation = useMutation((chat_id) => {
+    setData(createMessage, { content: input, chatId: chat_id }, "", token);
+    setData(update_last_message, { message: input, chatId: chat_id }, "", token);
   });
 
+  const createGroupChatParticipantsMutation = useMutation((chat_id) => {
+    setData(createChatParticipants, { chatId: chat_id, userId: user.id }, "", token);
+  });
+
+  const createOneToOneChatMutation = useMutation((username) => {
+    setData(createChat, { username: username }, "", token),
+      {
+        onSuccess: (response) => {
+          console.log(response);
+          setNewChatId(response.data.create_chats_item.id);
+        },
+      };
+  });
+
+  const createOneToOneChatParticipantsMutation = useMutation((user_id) => {
+    setData(createOneToOneChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
+    setData(createOneToOneChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
+  });
+
+  // Subscriptions
   client.subscribe(
     {
-      query: subscription,
+      query: messagesSubscription,
     },
     {
       next: ({ data }) => {
+        // console.log(data);
+        const receivedData = data.messages_mutated.data;
+        if (receivedData.user_created.id !== user.id) {
+          const newMessage = {
+            id: receivedData.id,
+            content: receivedData.content,
+            user_created: {
+              first_name: receivedData.user_created.first_name,
+              id: receivedData.user_created.id,
+            },
+            date_created: receivedData.date_created,
+          };
+          setReceivedMessage(newMessage);
+        }
+      },
+      error: (err) => {
+        console.log(err);
+      },
+      complete: () => {},
+    }
+  );
+
+  client.subscribe(
+    {
+      query: chatsSubscription,
+    },
+    {
+      next: ({ data }) => {
+        if (data && data.chats_mutated.event === "create") {
+          setNewChatId(data.chats_mutated.data.id);
+        }
+        if (data && data.chats_mutated.event === "update") {
+          setLastMessage(data.chats_mutated.data.last_message);
+        }
         console.log(data);
       },
       error: (err) => {
@@ -83,35 +161,104 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     }
   );
 
+  // UseEffect calls
+  useEffect(() => {
+    if (isUsersSuccess) {
+      setPeople(users.data.users);
+    }
+    if (isGroupChatsSuccess) {
+      setGroups(groupChats);
+    }
+  }, [users, isUsersSuccess, groupChats, isGroupChatsSuccess]);
+
+  useEffect(() => {
+    if (newChatId) {
+      createOneToOneChatParticipantsMutation.mutate(selectedChat.id);
+    }
+  }, [newChatId]);
+
+  useEffect(() => {
+    if (messages.length) {
+      const isMessage = messages.filter((item) => item.id === receivedMessage.id);
+      isMessage.length ? null : setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+    }
+  }, [receivedMessage]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {}, [lastMessage]);
+
   if (!isOpen) return null;
 
   const handleSendMessage = () => {
+    if (!selectedChat) {
+      alert("Please, choose the chat first!");
+      return;
+    }
     if (input.trim()) {
       const userMessage = {
-        text: input,
-        sender: "user",
-        time: format(new Date(), "eeee, h:mmaaa"),
+        content: input,
+        user_created: {
+          id: user.id,
+        },
+        date_created: new Date(),
       };
       setMessages([...messages, userMessage]);
-      createMessageMutation.mutate(input);
+      createMessageMutation.mutate(selectedChat.id);
       setInput("");
-      handleBotResponse(userMessage.text);
+      // handleBotResponse(userMessage.text);
     }
   };
 
   const handleBotResponse = (userMessage) => {
     setTimeout(() => {
       const botMessage = {
-        text: `You said: ${userMessage}`,
-        sender: "bot",
-        time: format(new Date(), "eeee, h:mmaaa"),
+        content: `You said: ${userMessage}`,
+        user_created: {
+          first_name: "bot",
+        },
+        date_created: new Date(),
       };
       setMessages((prevMessages) => [...prevMessages, botMessage]);
     }, 1000);
+  };
+
+  // Select chat and get all messages from this chat or create new chat if it does not exist
+  const handleSelectChat = async (chat) => {
+    setActiveChat(chat);
+    const isUserInChat = await getData(
+      getUserChat,
+      "chat_participants",
+      { chatId: [chat.id, user.id], userId: user.id },
+      token
+    );
+    console.log(isUserInChat);
+    if (chat.type === "group") {
+      if (!isUserInChat.length) {
+        createGroupChatParticipantsMutation.mutate(chat.id);
+      }
+      setSelectedChat({
+        id: chat.id,
+        chat_name: chat.chat_name,
+        chat_icon: chat.chat_icon ? chat.chat_icon.id : null,
+      });
+    } else {
+      if (!isUserInChat.length) {
+        createOneToOneChatMutation.mutate(chat.first_name);
+      }
+      setSelectedChat({
+        id: chat.id,
+        chat_name: chat.first_name,
+        chat_icon: chat.avatar ? chat.avatar.id : null,
+        type: "one_to_one",
+      });
+    }
+
+    const chatMessages = await getData(getChatUsersMessages, "messages", { chatId: chat.id }, token);
+    chatMessages.length ? setMessages(chatMessages) : setMessages([]);
+    console.log(chatMessages);
   };
 
   return (
@@ -135,19 +282,33 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                 fill="#7C7C7C"
               />
             </svg>
-            <input type="text" className="chat-popup__search" placeholder="Search" />
+            <input
+              onChange={(e) => setInputSearchValue(e.target.value)}
+              value={inputSearchValue}
+              type="text"
+              className="chat-popup__search"
+              placeholder="Search"
+            />
           </div>
           <div className="chat-popup__users groups">
             <h4 className="chat-popup__users-title">Groups</h4>
             <ul className="chat-popup__users-list">
               {groups.map((group, index) => (
-                <li key={index} className="chat-popup__users-item">
+                <li
+                  key={index}
+                  onClick={() => handleSelectChat(group)}
+                  className={`chat-popup__users-item ${activeChat === group ? "selected" : ""}`}
+                >
                   <Image
                     className="chat-popup__users-item-img"
                     width={40}
                     height={40}
-                    src={group.chat_icon}
-                    alt={group.name}
+                    src={
+                      group.chat_icon
+                        ? `${assetsUrl}/${group.chat_icon.id}?width=40&height=40`
+                        : favicon
+                    }
+                    alt={group.chat_name}
                   />
                   <div className="chat-popup__users-item-wrapp">
                     <div className="chat-popup__users-item-box">
@@ -155,7 +316,12 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                       <p className="chat-popup__users-item-text">{group.last_message}</p>
                     </div>
                     <div className="chat-popup__users-item-box rightAlign">
-                      <p className="chat-popup__users-item-time">{format(group.date_updated, "eeee, h:mmaaa")}</p>
+                      <p className="chat-popup__users-item-time">
+                        {format(
+                          group.date_updated ? group.date_updated : group.date_created,
+                          "eeee, h:mmaaa"
+                        )}
+                      </p>
                       <p
                         className={`chat-popup__users-item-time-checked ${
                           group.messageCount !== 0 ? "unread" : ""
@@ -172,55 +338,82 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
           <div className="chat-popup__users people">
             <h4 className="chat-popup__users-title">People</h4>
             <ul className="chat-popup__users-list">
-              {people.map((person, index) => (
-                <li key={index} className="chat-popup__users-item">
-                  <Image
-                    className="chat-popup__users-item-img"
-                    width={40}
-                    height={40}
-                    src={person.chat_icon}
-                    alt={person.name}
-                  />
-                  <div className="chat-popup__users-item-wrapp">
-                    <div className="chat-popup__users-item-box">
-                      <h5 className="chat-popup__users-item-username">{person.chat_name}</h5>
-                      <p className="chat-popup__users-item-text">{person.last_message}</p>
-                    </div>
-                    <div className="chat-popup__users-item-box rightAlign">
-                      <p className="chat-popup__users-item-time">{format(person.date_updated, "eeee, h:mmaaa")}</p>
-                      <p
-                        className={`chat-popup__users-item-time-checked ${
-                          person.messageCount !== 0 ? "unread" : ""
-                        }`}
-                      >
-                        {person.messageCount > 0 ? person.messageCount : "✔"}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
+              {people
+                ? people.map((person, index) => (
+                    <li
+                      key={index}
+                      onClick={() => handleSelectChat(person)}
+                      className={`chat-popup__users-item ${activeChat === person ? "selected" : ""}`}
+                    >
+                      <Image
+                        className="chat-popup__users-item-img"
+                        width={40}
+                        height={40}
+                        src={
+                          person.avatar
+                            ? `${assetsUrl}/${person.avatar.id}?width=40&height=40`
+                            : favicon
+                        }
+                        alt={person.first_name}
+                      />
+                      <div className="chat-popup__users-item-wrapp">
+                        <div className="chat-popup__users-item-box">
+                          <h5 className="chat-popup__users-item-username">{person.first_name}</h5>
+                          {/* <p className="chat-popup__users-item-text">{person.last_message}</p> */}
+                        </div>
+                        <div className="chat-popup__users-item-box rightAlign">
+                          <p className="chat-popup__users-item-time">
+                            {person.last_access && format(person.last_access, "eeee, h:mmaaa")}
+                          </p>
+                          <p
+                            className={`chat-popup__users-item-time-checked ${
+                              person.messageCount !== 0 ? "unread" : ""
+                            }`}
+                          >
+                            {person.messageCount > 0 ? person.messageCount : "✔"}
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ))
+                : null}
             </ul>
           </div>
         </div>
         <div className="chat-popup__chat">
           <div className="chat-popup__chat-header">
             <div className="chat-popup__chat-header-box">
-              <h5 className="chat-popup__chat-header-title">Martin</h5>
-              <p className="chat-popup__chat-header-subtitle">Online</p>
+              <h5 className="chat-popup__chat-header-title">
+                {selectedChat ? selectedChat.first_name || selectedChat.chat_name : null}
+              </h5>
+              {/* <p className="chat-popup__chat-header-subtitle">Online</p> */}
             </div>
-            <Image
-              className="chat-popup__chat-header-avatar"
-              width={64}
-              height={64}
-              src={icon05}
-              alt=""
-            />
+            {selectedChat ? (
+              <Image
+                className="chat-popup__chat-header-avatar"
+                width={64}
+                height={64}
+                src={
+                  selectedChat.chat_icon
+                    ? `${assetsUrl}/${selectedChat.chat_icon}?width=64&height=64`
+                    : favicon
+                }
+                alt="chat_icon"
+              />
+            ) : null}
           </div>
           <div className="chat-popup__chat-messages">
             {messages.map((message, index) => (
-              <div key={index} className={`chat-popup__chat-message ${message.sender}`}>
-                <div className="chat-popup__chat-message-text">{message.text}</div>
-                <div className="chat-popup__chat-message-time">{message.time}</div>
+              <div
+                key={index}
+                className={`chat-popup__chat-message ${
+                  message?.user_created.id === user.id ? "user" : "bot"
+                }`}
+              >
+                <div className="chat-popup__chat-message-text">{message?.content}</div>
+                <div className="chat-popup__chat-message-time">
+                  {message?.date_created && format(message.date_created, "eeee, h:mmaaa")}
+                </div>
               </div>
             ))}
             <div ref={messagesEndRef} />

@@ -27,7 +27,7 @@ const RegPopup = ({ isOpen, onClose }) => {
   const signUpMutation = useMutation((newUser) => {
     setData(createNewUser, { data: newUser }, "/system").then(
       (response) => {
-        if (response.create_users_item) {
+        if (response.data.create_users_item) {
           onClose();
         } else {
           setError("This email has already used");
