@@ -495,6 +495,7 @@ $radius: 25px
         min-width: 40px
         max-width: 40px
         margin-right: 16px
+        border-radius: 100%
       &-wrapp
         display: flex
         align-items: center
@@ -565,6 +566,7 @@ $radius: 25px
       &-avatar
         max-width: 64px
         min-width: 64px
+        border-radius: 100%
 
   &__chats
     width: 50%
@@ -607,10 +609,16 @@ $radius: 25px
 .chat-popup__chat-message
   margin-bottom: 10px
   display: flex
+  flex-direction: row
+  align-items: center
+
+.chat-popup__chat-message.box
+  display: flex
   flex-direction: column
 
-
 .chat-popup__chat-message.user
+  justify-content: end
+
   & .chat-popup__chat-message-text
     background-color: #6E00FF
     color: $white
@@ -626,6 +634,11 @@ $radius: 25px
     align-self: flex-start
     max-width: 300px
     border-radius: 25px
+
+.chat-popup__chat-message-username
+    font-size: 20px
+    font-family: "Roboto", sans-serif
+    font-weight: bold
 
 
 .chat-popup__chat-message-text

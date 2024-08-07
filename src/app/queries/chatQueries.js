@@ -44,9 +44,9 @@ export const createMessage = `
 `;
 
 export const getUserChat = `
-    query Chat_participants ($chatId: [String], $userId: String) {
+    query Chat_participants ($chatId: String, $userId: String) {
         chat_participants(
-            filter: { chat_id: {id: { _in: $chatId } }, user_id: { id: { _eq: $userId } } }
+            filter: { chat_id: {id: { _eq: $chatId } }, user_id: { id: { _eq: $userId } } }
         ) {
             chat_id {
                 id
@@ -147,9 +147,9 @@ export const getSearchedUsers = `
 `;
 
 export const createChat = `
-    mutation Create_chats_item ($username: String, $chatId: ID) {
+    mutation Create_chats_item ($username: String, $user1: String, $user2: String ) {
         create_chats_item(
-            data: { id: $chatId, chat_name: $username, type: "one_to_one" }
+            data: {user_1: $user1, user_2: $user2  , chat_name: $username, type: "one_to_one" }
         ) {
             id
             date_created
@@ -180,23 +180,7 @@ export const createChatParticipants = `
     }
 `;
 
-export const createOneToOneChatParticipants = `
-    mutation Create_chat_participants_item ($chatId: ID, $userId: String) {
-        create_chat_participants_item(
-            data: {chat_id:{id: $chatId}, user_id: $userId} 
-        ) {
-            chat_id {
-                id
-                date_created
-                date_updated
-                type
-                chat_name
-                last_message
-            }
-        }
-    }
-`;
-export const update_last_message = `
+export const updateLastMessage = `
     mutation Update_chats_item ($chatId: ID!, $message: String) {
         update_chats_item(id: $chatId, data: { last_message: $message }) {
             id
@@ -208,4 +192,17 @@ export const update_last_message = `
             last_message
         }
     }
+`;
+
+export const getOneToOneChat = `
+    query Chats ($users: [String]) {
+    chats(filter: { user_1: { id: { _in: $users } }, user_2: { id: { _in: $users } } }) {
+        id
+        date_created
+        date_updated
+        type
+        chat_name
+        last_message
+    }
+}
 `;

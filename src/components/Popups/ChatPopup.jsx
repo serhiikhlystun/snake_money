@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import "./Popup.sass";
-import { format } from "date-fns";
+import formatDate from "@/helpers/formatDate";
+import sortArrayByDate from "@/helpers/sortArrayByDate";
 import { createClient } from "graphql-ws";
 import {
   messagesSubscription,
@@ -13,9 +14,9 @@ import {
   getChatUsersMessages,
   createChatParticipants,
   createChat,
-  createOneToOneChatParticipants,
   getSearchedUsers,
-  update_last_message,
+  updateLastMessage,
+  getOneToOneChat,
 } from "@/app/queries/chatQueries";
 import { useMutation, useQuery } from "react-query";
 import setData from "@/helpers/setData";
@@ -55,7 +56,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
   const [newChatId, setNewChatId] = useState("");
   const [inputSearchValue, setInputSearchValue] = useState("");
   const [receivedMessage, setReceivedMessage] = useState();
-  const [lastMessage, setLastMessage] = useState("");
+  const [lastMessage, setLastMessage] = useState({});
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,15 +90,15 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
   // Mutations
   const createMessageMutation = useMutation((chat_id) => {
     setData(createMessage, { content: input, chatId: chat_id }, "", token);
-    setData(update_last_message, { message: input, chatId: chat_id }, "", token);
+    setData(updateLastMessage, { message: input, chatId: chat_id }, "", token);
   });
 
   const createGroupChatParticipantsMutation = useMutation((chat_id) => {
     setData(createChatParticipants, { chatId: chat_id, userId: user.id }, "", token);
   });
 
-  const createOneToOneChatMutation = useMutation((username) => {
-    setData(createChat, { username: username }, "", token),
+  const createOneToOneChatMutation = useMutation((variables) => {
+    setData(createChat, variables, "", token),
       {
         onSuccess: (response) => {
           console.log(response);
@@ -107,8 +108,8 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
   });
 
   const createOneToOneChatParticipantsMutation = useMutation((user_id) => {
-    setData(createOneToOneChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
-    setData(createOneToOneChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
+    setData(createChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
+    setData(createChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
   });
 
   // Subscriptions
@@ -118,7 +119,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     },
     {
       next: ({ data }) => {
-        // console.log(data);
+        console.log(data);
         const receivedData = data.messages_mutated.data;
         if (receivedData.user_created.id !== user.id) {
           const newMessage = {
@@ -129,6 +130,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
               id: receivedData.user_created.id,
             },
             date_created: receivedData.date_created,
+            chat_id: receivedData.chat_id.id,
           };
           setReceivedMessage(newMessage);
         }
@@ -150,7 +152,10 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
           setNewChatId(data.chats_mutated.data.id);
         }
         if (data && data.chats_mutated.event === "update") {
-          setLastMessage(data.chats_mutated.data.last_message);
+          setLastMessage({
+            chat_id: data.chats_mutated.data.id,
+            chat_last_message: data.chats_mutated.data.last_message,
+          });
         }
         console.log(data);
       },
@@ -173,14 +178,17 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
 
   useEffect(() => {
     if (newChatId) {
-      createOneToOneChatParticipantsMutation.mutate(selectedChat.id);
+      createOneToOneChatParticipantsMutation.mutate();
+      newChatId;
     }
   }, [newChatId]);
 
   useEffect(() => {
     if (messages.length) {
-      const isMessage = messages.filter((item) => item.id === receivedMessage.id);
-      isMessage.length ? null : setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+      if (selectedChat.id === receivedMessage.chat_id) {
+        const isMessage = messages.filter((item) => item.id === receivedMessage.id);
+        isMessage.length ? null : setMessages((prevMessages) => [...prevMessages, receivedMessage]);
+      }
     }
   }, [receivedMessage]);
 
@@ -188,7 +196,13 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     scrollToBottom();
   }, [messages]);
 
-  useEffect(() => {}, [lastMessage]);
+  useEffect(() => {
+    const helpedArr = groups;
+    helpedArr.map((item) => {
+      item.id === lastMessage.chat_id ? (item.last_message = lastMessage.chat_last_message) : null;
+    });
+    setGroups(helpedArr);
+  }, [lastMessage]);
 
   if (!isOpen) return null;
 
@@ -206,9 +220,9 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
         date_created: new Date(),
       };
       setMessages([...messages, userMessage]);
+      
       createMessageMutation.mutate(selectedChat.id);
       setInput("");
-      // handleBotResponse(userMessage.text);
     }
   };
 
@@ -231,10 +245,16 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     const isUserInChat = await getData(
       getUserChat,
       "chat_participants",
-      { chatId: [chat.id, user.id], userId: user.id },
+      { chatId: chat.id, userId: user.id },
       token
     );
-    console.log(isUserInChat);
+    const isPersonalChat = await getData(
+      getOneToOneChat,
+      "chats",
+      { users: [user.id, chat.id] },
+      token
+    );
+
     if (chat.type === "group") {
       if (!isUserInChat.length) {
         createGroupChatParticipantsMutation.mutate(chat.id);
@@ -244,21 +264,37 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
         chat_name: chat.chat_name,
         chat_icon: chat.chat_icon ? chat.chat_icon.id : null,
       });
+
+      const chatMessages = await getData(getChatUsersMessages, "messages", { chatId: chat.id }, token);
+      chatMessages.length ? setMessages(sortArrayByDate(chatMessages)) : setMessages([]);
     } else {
-      if (!isUserInChat.length) {
-        createOneToOneChatMutation.mutate(chat.first_name);
+      if (!isPersonalChat.length) {
+        createOneToOneChatMutation.mutate({
+          username: chat.first_name,
+          user1: user.id,
+          user2: chat.id,
+        });
       }
       setSelectedChat({
-        id: chat.id,
+        id: isPersonalChat[0].id,
         chat_name: chat.first_name,
         chat_icon: chat.avatar ? chat.avatar.id : null,
         type: "one_to_one",
       });
-    }
+      console.log(isPersonalChat);
 
-    const chatMessages = await getData(getChatUsersMessages, "messages", { chatId: chat.id }, token);
-    chatMessages.length ? setMessages(chatMessages) : setMessages([]);
-    console.log(chatMessages);
+      const personalChatMessages = await getData(
+        getChatUsersMessages,
+        "messages",
+        { chatId: isPersonalChat[0].id },
+        token
+      );
+      console.log(personalChatMessages);
+      
+      personalChatMessages.length
+        ? setMessages(sortArrayByDate(personalChatMessages))
+        : setMessages([]);
+    }
   };
 
   return (
@@ -317,9 +353,8 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                     </div>
                     <div className="chat-popup__users-item-box rightAlign">
                       <p className="chat-popup__users-item-time">
-                        {format(
-                          group.date_updated ? group.date_updated : group.date_created,
-                          "eeee, h:mmaaa"
+                        {formatDate(
+                          new Date(group.date_updated ? group.date_updated : group.date_created)
                         )}
                       </p>
                       <p
@@ -363,7 +398,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                         </div>
                         <div className="chat-popup__users-item-box rightAlign">
                           <p className="chat-popup__users-item-time">
-                            {person.last_access && format(person.last_access, "eeee, h:mmaaa")}
+                            {person.last_access && formatDate(person.last_access)}
                           </p>
                           <p
                             className={`chat-popup__users-item-time-checked ${
@@ -410,10 +445,43 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                   message?.user_created.id === user.id ? "user" : "bot"
                 }`}
               >
-                <div className="chat-popup__chat-message-text">{message?.content}</div>
-                <div className="chat-popup__chat-message-time">
-                  {message?.date_created && format(message.date_created, "eeee, h:mmaaa")}
+                {message?.user_created.id !== user.id ? (
+                  <Image
+                    className="chat-popup__users-item-img"
+                    width={40}
+                    height={40}
+                    src={
+                      message.user_created.avatar
+                        ? `${assetsUrl}/${message.user_created.avatar.id}?width=40&height=40`
+                        : favicon
+                    }
+                    alt={message.user_created.first_name}
+                  />
+                ) : null}
+                <div className="chat-popup__chat-message-box">
+                  <div className="chat-popup__chat-message-text">
+                    <p className="chat-popup__chat-message-username">
+                      {message.user_created.first_name}
+                    </p>
+                    {message?.content}
+                  </div>
+                  <div className="chat-popup__chat-message-time">
+                    {message?.date_created && formatDate(message.date_created)}
+                  </div>
                 </div>
+                {message?.user_created.id === user.id ? (
+                  <Image
+                    className="chat-popup__users-item-img"
+                    width={40}
+                    height={40}
+                    src={
+                      message.user_created.avatar
+                        ? `${assetsUrl}/${message.user_created.avatar.id}?width=40&height=40`
+                        : favicon
+                    }
+                    alt={message.user_created.first_name}
+                  />
+                ) : null}
               </div>
             ))}
             <div ref={messagesEndRef} />
