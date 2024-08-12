@@ -1,6 +1,7 @@
 const graphQLAPI = process.env.NEXT_PUBLIC_GRAPHQL;
 
 const setData = async (mutation, data = {}, additionalPath = '', token) => {  
+  
   const query = JSON.stringify({
     query: mutation,
     variables: data,

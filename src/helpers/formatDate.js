@@ -1,6 +1,7 @@
 import { format, isToday, isYesterday ,isWithinInterval, subDays } from "date-fns";
 
 const formatDate = (date) => {
+  
   const now = new Date();
   const oneWeekAgo = subDays(now, 7);
 

@@ -3,10 +3,7 @@ import Image from "next/image";
 import "./Popup.sass";
 import formatDate from "@/helpers/formatDate";
 import sortArrayByDate from "@/helpers/sortArrayByDate";
-import { createClient } from "graphql-ws";
 import {
-  messagesSubscription,
-  chatsSubscription,
   createMessage,
   getUserChat,
   getGroupChats,
@@ -30,7 +27,6 @@ import att from "/public/img/att.svg";
 import playIcon from "/public/img/playIcon.png";
 import favicon from "./../../../public/img/favicon.png";
 
-const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
 const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
 
 async function handleUsersFiltering({ queryKey }) {
@@ -45,36 +41,37 @@ async function handleUsersFiltering({ queryKey }) {
   return await fetchData(getUsers, { variables }, "/system", queryKey[2]);
 }
 
-const ChatPopup = ({ isOpen, onClose, token, user }) => {
+const ChatPopup = ({
+  isOpen,
+  onClose,
+  token,
+  user,
+  messagesSubscriptionData,
+  usersSubscriptionData,
+  chatsSubscriptionData,
+}) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [groups, setGroups] = useState([]);
   const [people, setPeople] = useState([]);
   const messagesEndRef = useRef(null);
   const [selectedChat, setSelectedChat] = useState();
-  const [activeChat, setActiveChat] = useState(null);
   const [newChatId, setNewChatId] = useState("");
   const [inputSearchValue, setInputSearchValue] = useState("");
   const [receivedMessage, setReceivedMessage] = useState();
   const [lastMessage, setLastMessage] = useState({});
+  const [changedUserStatus, setChangedUserStatus] = useState();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  const client = createClient({
-    url: apiUrl,
-    keepAlive: 30000,
-    connectionParams: async () => {
-      return { access_token: token };
-    },
-  });
 
   // Queries
   const { data: users, isSuccess: isUsersSuccess } = useQuery(
     ["users", inputSearchValue, token, user?.id],
     handleUsersFiltering,
     {
+      enabled: !!user,
       refetchOnWindowFocus: false,
     }
   );
@@ -101,7 +98,6 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     setData(createChat, variables, "", token),
       {
         onSuccess: (response) => {
-          console.log(response);
           setNewChatId(response.data.create_chats_item.id);
         },
       };
@@ -111,60 +107,6 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     setData(createChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
     setData(createChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
   });
-
-  // Subscriptions
-  client.subscribe(
-    {
-      query: messagesSubscription,
-    },
-    {
-      next: ({ data }) => {
-        console.log(data);
-        const receivedData = data.messages_mutated.data;
-        if (receivedData.user_created.id !== user.id) {
-          const newMessage = {
-            id: receivedData.id,
-            content: receivedData.content,
-            user_created: {
-              first_name: receivedData.user_created.first_name,
-              id: receivedData.user_created.id,
-            },
-            date_created: receivedData.date_created,
-            chat_id: receivedData.chat_id.id,
-          };
-          setReceivedMessage(newMessage);
-        }
-      },
-      error: (err) => {
-        console.log(err);
-      },
-      complete: () => {},
-    }
-  );
-
-  client.subscribe(
-    {
-      query: chatsSubscription,
-    },
-    {
-      next: ({ data }) => {
-        if (data && data.chats_mutated.event === "create") {
-          setNewChatId(data.chats_mutated.data.id);
-        }
-        if (data && data.chats_mutated.event === "update") {
-          setLastMessage({
-            chat_id: data.chats_mutated.data.id,
-            chat_last_message: data.chats_mutated.data.last_message,
-          });
-        }
-        console.log(data);
-      },
-      error: (err) => {
-        console.log(err);
-      },
-      complete: () => {},
-    }
-  );
 
   // UseEffect calls
   useEffect(() => {
@@ -182,6 +124,51 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
       newChatId;
     }
   }, [newChatId]);
+
+  useEffect(() => {
+    if (messagesSubscriptionData) {
+      const receivedData = messagesSubscriptionData.messages_mutated.data;
+      if (receivedData.user_created.id !== user.id) {
+        const newMessage = {
+          id: receivedData.id,
+          content: receivedData.content,
+          user_created: {
+            first_name: receivedData.user_created.first_name,
+            id: receivedData.user_created.id,
+          },
+          date_created: receivedData.date_created,
+          chat_id: receivedData.chat_id.id,
+        };
+        setReceivedMessage(newMessage);
+      }
+    }
+  }, [messagesSubscriptionData]);
+
+  useEffect(() => {
+    if (chatsSubscriptionData) {
+      const receivedData = chatsSubscriptionData.chats_mutated.data;
+      if (chatsSubscriptionData.chats_mutated.event === "create") {
+        setNewChatId(receivedData.id);
+      }
+      if (chatsSubscriptionData.chats_mutated.event === "update") {
+        setLastMessage({
+          chat_id: receivedData.id,
+          chat_last_message: receivedData.last_message,
+        });
+      }
+    }
+  }, [chatsSubscriptionData]);
+
+  useEffect(() => {
+    if (usersSubscriptionData) {
+      if (usersSubscriptionData.directus_users_mutated.event === "update") {
+        setChangedUserStatus({
+          user_id: usersSubscriptionData.directus_users_mutated.data.id,
+          is_online: usersSubscriptionData.directus_users_mutated.data.is_online,
+        });
+      }
+    }
+  }, [usersSubscriptionData]);
 
   useEffect(() => {
     if (messages.length) {
@@ -204,6 +191,25 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
     setGroups(helpedArr);
   }, [lastMessage]);
 
+  useEffect(() => {
+    const helpedArr = people;
+    if (changedUserStatus !== undefined) {
+      helpedArr.map((person) => {
+        person.id === changedUserStatus.user_id
+          ? (person.is_online = changedUserStatus.is_online)
+          : null;
+      });
+      setPeople(helpedArr);
+
+      if (selectedChat && changedUserStatus.user_id === selectedChat.user2_id) {
+        setSelectedChat((prevState) => ({
+          ...prevState,
+          isUserOnline: changedUserStatus.is_online,
+        }));
+      }
+    }
+  }, [changedUserStatus]);
+
   if (!isOpen) return null;
 
   const handleSendMessage = () => {
@@ -220,7 +226,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
         date_created: new Date(),
       };
       setMessages([...messages, userMessage]);
-      
+
       createMessageMutation.mutate(selectedChat.id);
       setInput("");
     }
@@ -241,7 +247,6 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
 
   // Select chat and get all messages from this chat or create new chat if it does not exist
   const handleSelectChat = async (chat) => {
-    setActiveChat(chat);
     const isUserInChat = await getData(
       getUserChat,
       "chat_participants",
@@ -274,26 +279,25 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
           user1: user.id,
           user2: chat.id,
         });
+      } else {
+        const personalChatMessages = await getData(
+          getChatUsersMessages,
+          "messages",
+          { chatId: isPersonalChat[0].id },
+          token
+        );
+        personalChatMessages.length
+          ? setMessages(sortArrayByDate(personalChatMessages))
+          : setMessages([]);
       }
       setSelectedChat({
-        id: isPersonalChat[0].id,
+        id: isPersonalChat.length ? isPersonalChat[0].id : newChatId,
         chat_name: chat.first_name,
         chat_icon: chat.avatar ? chat.avatar.id : null,
         type: "one_to_one",
+        isUserOnline: chat.is_online,
+        user2_id: chat.id,
       });
-      console.log(isPersonalChat);
-
-      const personalChatMessages = await getData(
-        getChatUsersMessages,
-        "messages",
-        { chatId: isPersonalChat[0].id },
-        token
-      );
-      console.log(personalChatMessages);
-      
-      personalChatMessages.length
-        ? setMessages(sortArrayByDate(personalChatMessages))
-        : setMessages([]);
     }
   };
 
@@ -333,7 +337,9 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                 <li
                   key={index}
                   onClick={() => handleSelectChat(group)}
-                  className={`chat-popup__users-item ${activeChat === group ? "selected" : ""}`}
+                  className={`chat-popup__users-item ${
+                    selectedChat?.id === group.id ? "selected" : ""
+                  }`}
                 >
                   <Image
                     className="chat-popup__users-item-img"
@@ -378,7 +384,9 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                     <li
                       key={index}
                       onClick={() => handleSelectChat(person)}
-                      className={`chat-popup__users-item ${activeChat === person ? "selected" : ""}`}
+                      className={`chat-popup__users-item ${
+                        selectedChat?.user2_id === person.id ? "selected" : ""
+                      }`}
                     >
                       <Image
                         className="chat-popup__users-item-img"
@@ -394,7 +402,7 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
                       <div className="chat-popup__users-item-wrapp">
                         <div className="chat-popup__users-item-box">
                           <h5 className="chat-popup__users-item-username">{person.first_name}</h5>
-                          {/* <p className="chat-popup__users-item-text">{person.last_message}</p> */}
+                          <p className="chat-popup__users-item-text">{}</p>
                         </div>
                         <div className="chat-popup__users-item-box rightAlign">
                           <p className="chat-popup__users-item-time">
@@ -421,7 +429,11 @@ const ChatPopup = ({ isOpen, onClose, token, user }) => {
               <h5 className="chat-popup__chat-header-title">
                 {selectedChat ? selectedChat.first_name || selectedChat.chat_name : null}
               </h5>
-              {/* <p className="chat-popup__chat-header-subtitle">Online</p> */}
+              {selectedChat?.type === "one_to_one" ? (
+                <p className="chat-popup__chat-header-subtitle">
+                  {selectedChat.isUserOnline ? "Online" : "Offline"}
+                </p>
+              ) : null}
             </div>
             {selectedChat ? (
               <Image

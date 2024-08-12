@@ -20,12 +20,6 @@ import AuthPopup from "@/components/Popups/AuthPopup";
 
 import fixIcon from "/public/img/fix.svg";
 import chatIcon from "/public/img/chat.svg";
-import icon01 from "/public/img/icon01.jpg";
-import icon02 from "/public/img/icon02.jpg";
-import icon03 from "/public/img/icon03.jpg";
-import icon04 from "/public/img/icon04.jpg";
-import icon05 from "/public/img/icon05.jpg";
-import icon06 from "/public/img/icon06.jpg";
 
 import { useSession } from "next-auth/react";
 import { useQuery, useMutation } from "react-query";
@@ -33,8 +27,19 @@ import { getCurrentUser, getUserData, createUserData, updateCurrentUser } from "
 import fetchData from "@/helpers/fetchData";
 import getData from "./queries/getData";
 import setData from "@/helpers/setData";
+import { createClient } from "graphql-ws";
+import {
+  messagesSubscription,
+  chatsSubscription,
+  usersSubscription,
+  userOnlineMutated,
+} from "./queries/chatQueries";
+import { getWebSocketClient } from "@/helpers/getWebSocketClient";
+
+// const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
 
 function App() {
+  const [client, setClient] = useState(null);
   const [isPortrait, setIsPortrait] = useState(window.innerWidth < 900);
   const [regPopupOpen, setRegPopupOpen] = useState(false);
   const [aboutPopupOpen, setAboutPopupOpen] = useState(false);
@@ -47,13 +52,82 @@ function App() {
   const [authPopupOpen, setAuthPopupOpen] = useState(false);
   const [updatedUserInfo, setUpdatedUserInfo] = useState({});
   const [userAvatar, setUserAvatar] = useState("");
+  const [usersSubscriptionData, setUsersSubscriptionData] = useState();
+  const [messagesSubscriptionData, setMessagesSubscriptionData] = useState();
+  const [chatsSubscriptionData, setChatsSubscriptionData] = useState();
+  const [isUserOnline, setIsUserOnline] = useState(false);
 
   const { data: session, status } = useSession();
+
+  useEffect(() => {
+    const wsClient = getWebSocketClient(session?.user.accessToken);
+    setClient(wsClient);
+  }, [session]);
+
+  useEffect(() => {
+    if (client) {
+      setIsUserOnline(true);
+      // Subscribe to the client
+      const unsubscribeMessages = client.subscribe(
+        {
+          query: messagesSubscription,
+        },
+        {
+          next: ({ data }) => {
+            console.log(data);
+            setMessagesSubscriptionData(data);
+          },
+          error: (err) => {
+            console.log(err);
+          },
+          complete: () => {},
+        }
+      );
+
+      const unsubscribeChats = client.subscribe(
+        {
+          query: chatsSubscription,
+        },
+        {
+          next: ({ data }) => {
+            setChatsSubscriptionData(data);
+            console.log(data);
+          },
+          error: (err) => {
+            console.log(err);
+          },
+          complete: () => {},
+        }
+      );
+
+      const unsubscribeUsers = client.subscribe(
+        {
+          query: usersSubscription,
+        },
+        {
+          next: ({ data }) => {
+            console.log(data);
+            setUsersSubscriptionData(data);
+          },
+          error: (err) => {
+            console.log(err);
+          },
+          complete: () => {},
+        }
+      );
+
+      return () => {
+        unsubscribeMessages(); // Clean up the subscription when the component unmounts
+        unsubscribeChats();
+        unsubscribeUsers();
+      };
+    }
+  }, [client]);
 
   // Query for getting current user's system info
   const { data: user, isSuccess: isUserSuccess } = useQuery(
     ["currentUser"],
-    async () => await fetchData(getCurrentUser, {}, "/system", session.user.accessToken),
+    async () => await fetchData(getCurrentUser, {}, "/system", session?.user.accessToken),
     {
       enabled: status === "authenticated",
       refetchOnWindowFocus: false,
@@ -63,7 +137,8 @@ function App() {
   // Query for getting current user's game account data
   const { data: userData, isSuccess: isUserDataSucces } = useQuery(
     "userData",
-    async () => await getData(getUserData, "user_data", { user_id: user.id }, session.user.accessToken),
+    async () =>
+      await getData(getUserData, "user_data", { user_id: user.id }, session?.user.accessToken),
     {
       enabled: isUserSuccess,
       refetchOnWindowFocus: false,
@@ -77,9 +152,23 @@ function App() {
   );
 
   // Update user's system info
-  const updateUserMutation = useMutation((updatedUser) => {
+  const updateUserMutation = useMutation(async (updatedUser) => {
     status === "authenticated" &&
-      setData(updateCurrentUser, { data: updatedUser }, "/system", session.user.accessToken);
+      (await setData(updateCurrentUser, { data: updatedUser }, "/system", session.user.accessToken));
+  });
+
+  // Change users status
+  const isOnlineMutation = useMutation(async (isOnline) => {
+    status === "authenticated" &&
+      (await setData(
+        userOnlineMutated,
+        { userId: user.id, isOnline: isOnline },
+        "/system",
+        session.user.accessToken
+      )),
+      {
+        enabled: isUserSuccess,
+      };
   });
 
   const handleUpdate = (e) => {
@@ -93,6 +182,25 @@ function App() {
       username: e.target.username.value ? e.target.username.value : user.first_name,
     });
   };
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      setIsUserOnline(false);
+      isOnlineMutation.mutate(false);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      isOnlineMutation.mutate(isUserOnline);
+    }
+  }, [isUserOnline, user]);
 
   useEffect(() => {
     if (userData && !userData.length) {
@@ -164,146 +272,7 @@ function App() {
     {
       content: <Image src={chatIcon} alt="chat icon" />,
       className: "square",
-      onClick: session ? openChatPopup: openAuthPopup,
-    },
-  ];
-
-  const groups = [
-    {
-      img: icon01,
-      name: "Friends Forever",
-      text: "Message from Group 1",
-      time: "Today, 10:00 AM",
-      messageCount: 2,
-    },
-    {
-      img: icon02,
-      name: "Mera Gang",
-      text: "Message from Group 2",
-      time: "Yesterday, 11:00 AM",
-      messageCount: 0,
-    },
-    {
-      img: icon03,
-      name: "Hiking",
-      text: "Message from Group 3",
-      time: "May 15, 12:00 PM",
-      messageCount: 1,
-    },
-    {
-      img: icon02,
-      name: "Car fest",
-      text: "Message from Group 3",
-      time: "May 15, 12:00 PM",
-      messageCount: 1,
-    },
-    {
-      img: icon01,
-      name: "Drunking",
-      text: "Message from Group 3",
-      time: "May 15, 12:00 PM",
-      messageCount: 1,
-    },
-  ];
-
-  const people = [
-    {
-      img: icon01,
-      name: "Jonny",
-      text: "Message from Person 1",
-      time: "Today, 1:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon02,
-      name: "Pedro",
-      text: "Message from Person 2",
-      time: "Yesterday, 2:00 PM",
-      messageCount: 3,
-    },
-    {
-      img: icon03,
-      name: "Martin",
-      text: "Message from Person 3",
-      time: "May 10, 3:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon04,
-      name: "Fernando",
-      text: "Message from Person 4",
-      time: "May 9, 4:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon05,
-      name: "Arni",
-      text: "Message from Person 5",
-      time: "May 8, 5:00 PM",
-      messageCount: 5,
-    },
-    {
-      img: icon06,
-      name: "Person 6",
-      text: "Message from Person 6",
-      time: "May 7, 6:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon01,
-      name: "Person 7",
-      text: "Message from Person 7",
-      time: "May 6, 7:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon02,
-      name: "Person 8",
-      text: "Message from Person 8",
-      time: "May 5, 8:00 PM",
-      messageCount: 1,
-    },
-    {
-      img: icon03,
-      name: "Person 9",
-      text: "Message from Person 9",
-      time: "May 4, 9:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon04,
-      name: "Person 10",
-      text: "Message from Person 10",
-      time: "May 3, 10:00 PM",
-      messageCount: 2,
-    },
-    {
-      img: icon05,
-      name: "Person 11",
-      text: "Message from Person 11",
-      time: "May 2, 11:00 PM",
-      messageCount: 0,
-    },
-    {
-      img: icon06,
-      name: "Person 12",
-      text: "Message from Person 12",
-      time: "May 1, 12:00 AM",
-      messageCount: 0,
-    },
-    {
-      img: icon01,
-      name: "Person 13",
-      text: "Message from Person 13",
-      time: "April 30, 1:00 AM",
-      messageCount: 0,
-    },
-    {
-      img: icon02,
-      name: "Person 14",
-      text: "Message from Person 14",
-      time: "April 29, 2:00 AM",
-      messageCount: 0,
+      onClick: session ? openChatPopup : openAuthPopup,
     },
   ];
 
@@ -362,16 +331,17 @@ function App() {
       <AboutPopup isOpen={aboutPopupOpen} onClose={closePopups} />
       <WhitepaperPopup isOpen={whitepaperPopupOpen} onClose={closePopups} />
       <ReferralsPopup isOpen={referralsPopupOpen} onClose={closePopups} />
-      {session ?
-      <ChatPopup
-        isOpen={chatPopupOpen}
-        onClose={closePopups}
-        groups={groups}
-        people={people}
-        token={session.user.accessToken}
-        user={user}
-      /> : null
-      }
+      {session ? (
+        <ChatPopup
+          isOpen={chatPopupOpen}
+          onClose={closePopups}
+          token={session.user.accessToken}
+          user={user}
+          usersSubscriptionData={usersSubscriptionData}
+          messagesSubscriptionData={messagesSubscriptionData}
+          chatsSubscriptionData={chatsSubscriptionData}
+        />
+      ) : null}
     </>
   );
 }

@@ -124,6 +124,7 @@ export const getUsers = `
             last_name
             email
             last_access
+            is_online
             avatar {
                 id
             }
@@ -206,3 +207,34 @@ export const getOneToOneChat = `
     }
 }
 `;
+
+export const usersSubscription = `
+    subscription Directus_users_mutated {
+    directus_users_mutated {
+        key
+        event
+        data {
+            id
+            first_name
+            last_name
+            email
+            status
+            token
+            last_access
+            is_online
+        }
+    }
+}
+`;
+
+export const userOnlineMutated = `
+    mutation Update_users_item ($userId: ID!, $isOnline: Boolean){
+    update_users_item(id: $userId, data: { is_online: $isOnline }) {
+        id
+        first_name
+        last_name
+        email
+        is_online
+    }
+}
+`
