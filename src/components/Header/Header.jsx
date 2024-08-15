@@ -11,31 +11,22 @@ import { signOut } from "next-auth/react";
 
 const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
 
-const Header = ({ user, userData, updatedUserInfo, updatedUserAvatar }) => {
+const Header = ({ user, userData, updatedUserInfo }) => {
   const userAvatar = user && user.avatar ? user.avatar.id : null;
-  
+
   return (
     <header className="header">
       <div className={`header__wrapper ${!user ? "no_user" : ""}`}>
         {user ? (
           <div className="header__avatar-inn">
             <div className="header__avatar-wrapp">
-              {updatedUserAvatar ? 
-              <Image
-                className="header__avatar"
-                width={120}
-                height={120}
-                src={updatedUserAvatar}
-                alt=""
-              /> :
               <Image
                 className="header__avatar"
                 width={120}
                 height={120}
                 src={userAvatar ? `${assetsUrl}/${userAvatar}?width=120&height=120` : avatar}
-                alt=""
+                alt="avatar"
               />
-            }
             </div>
             <div className="header__username-wrapp">
               <p className="header__username">

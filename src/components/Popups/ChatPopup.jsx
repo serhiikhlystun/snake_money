@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import "./Popup.sass";
 import formatDate from "@/helpers/formatDate";
-import sortArrayByDate from "@/helpers/sortArrayByDate";
+import { sortArrayByDate, sortArrayByDateUpdate, sortArrayByLastAccess } from "@/helpers/sortArrays";
 import {
   createMessage,
   getUserChat,
@@ -30,15 +30,20 @@ import favicon from "./../../../public/img/favicon.png";
 const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
 
 async function handleUsersFiltering({ queryKey }) {
+
   let variables = {};
   if (queryKey[1]) {
     variables = {
       value: queryKey[1],
     };
-    return await fetchData(getSearchedUsers, { variables }, "/system", queryKey[2]);
+    const data = await fetchData(getSearchedUsers, { variables }, "/system", queryKey[2]);
+    return data.data.users
   }
-  variables = { userId: queryKey[3] };
-  return await fetchData(getUsers, { variables }, "/system", queryKey[2]);
+  if (queryKey[3]) {
+    variables = { userId: queryKey[3] };
+    const data = await fetchData(getUsers, { variables }, "/system", queryKey[2]);
+    return data.data.users
+  }
 }
 
 const ChatPopup = ({
@@ -106,15 +111,15 @@ const ChatPopup = ({
   const createOneToOneChatParticipantsMutation = useMutation((user_id) => {
     setData(createChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
     setData(createChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
-  });
+  });  
 
   // UseEffect calls
   useEffect(() => {
-    if (isUsersSuccess) {
-      setPeople(users.data.users);
+    if (isUsersSuccess && users) {
+      setPeople(sortArrayByLastAccess(users));
     }
     if (isGroupChatsSuccess) {
-      setGroups(groupChats);
+      setGroups(sortArrayByDateUpdate(groupChats));
     }
   }, [users, isUsersSuccess, groupChats, isGroupChatsSuccess]);
 
@@ -486,12 +491,8 @@ const ChatPopup = ({
                     className="chat-popup__users-item-img"
                     width={40}
                     height={40}
-                    src={
-                      message.user_created.avatar
-                        ? `${assetsUrl}/${message.user_created.avatar.id}?width=40&height=40`
-                        : favicon
-                    }
-                    alt={message.user_created.first_name}
+                    src={user.avatar ? `${assetsUrl}/${user.avatar.id}?width=40&height=40` : favicon}
+                    alt={user.first_name}
                   />
                 ) : null}
               </div>
@@ -510,12 +511,12 @@ const ChatPopup = ({
               />
               <div className="chat-popup__chat-input-icons">
                 <div className="chat-popup__chat-input-icons-box">
-                  <Image src={att} alt="" />
-                  <Image src={cash} alt="" />
+                  <Image src={att} alt="att" />
+                  <Image src={cash} alt="cash" />
                 </div>
                 <div className="chat-popup__chat-input-icons-box">
-                  <Image src={emoji} alt="" />
-                  <Image src={cam} alt="" />
+                  <Image src={emoji} alt="emoji" />
+                  <Image src={cam} alt="cam" />
                 </div>
               </div>
             </div>

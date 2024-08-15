@@ -27,7 +27,6 @@ import { getCurrentUser, getUserData, createUserData, updateCurrentUser } from "
 import fetchData from "@/helpers/fetchData";
 import getData from "./queries/getData";
 import setData from "@/helpers/setData";
-import { createClient } from "graphql-ws";
 import {
   messagesSubscription,
   chatsSubscription,
@@ -36,11 +35,10 @@ import {
 } from "./queries/chatQueries";
 import { getWebSocketClient } from "@/helpers/getWebSocketClient";
 
-// const apiUrl = process.env.NEXT_PUBLIC_GRAPHQL;
-
 function App() {
   const [client, setClient] = useState(null);
-  const [isPortrait, setIsPortrait] = useState(window.innerWidth < 900);
+  const [currentUser, setCurrentUser] = useState({});
+  const [isPortrait, setIsPortrait] = useState(false);
   const [regPopupOpen, setRegPopupOpen] = useState(false);
   const [aboutPopupOpen, setAboutPopupOpen] = useState(false);
   const [whitepaperPopupOpen, setWhitepaperPopupOpen] = useState(false);
@@ -60,8 +58,10 @@ function App() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    const wsClient = getWebSocketClient(session?.user.accessToken);
-    setClient(wsClient);
+    if(session){
+      const wsClient = getWebSocketClient(session.user.accessToken);
+      setClient(wsClient);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -131,6 +131,7 @@ function App() {
     {
       enabled: status === "authenticated",
       refetchOnWindowFocus: false,
+      onSuccess: (user)=>setCurrentUser(user),
     }
   );
 
@@ -249,11 +250,14 @@ function App() {
     setReferralsPopupOpen(false);
     setChatPopupOpen(false);
     setAuthPopupOpen(false);
-  };
+  };  
 
   // Update user's avatar in the Header
-  const handleUpdateUserAvatar = (img) => {
-    setUserAvatar(img);
+  const handleUpdateUserAvatar = (id) => {
+    setCurrentUser((prevState)=>({
+      ...prevState,
+      avatar: {id: id}
+    }))
   };
 
   const sidebarContentLeft = [
@@ -291,8 +295,7 @@ function App() {
       <div className="homepage">
         <div className="container">
           <Header
-            user={user}
-            updatedUserAvatar={userAvatar}
+            user={currentUser}
             updatedUserInfo={updatedUserInfo}
             userData={isUserDataSucces ? userData[0] : null}
           />
@@ -318,7 +321,6 @@ function App() {
         updatedUserInfo={updatedUserInfo}
         handleUpdateUserAvatar={handleUpdateUserAvatar}
         token={session?.user.accessToken}
-        userAvatar={userAvatar}
       />
       <AuthPopup
         isOpen={authPopupOpen}
@@ -336,7 +338,7 @@ function App() {
           isOpen={chatPopupOpen}
           onClose={closePopups}
           token={session.user.accessToken}
-          user={user}
+          user={currentUser}
           usersSubscriptionData={usersSubscriptionData}
           messagesSubscriptionData={messagesSubscriptionData}
           chatsSubscriptionData={chatsSubscriptionData}

@@ -30,7 +30,7 @@ const SettingsPopup = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         setImageSrc(e.target.result);
-        handleUpdateUserAvatar(e.target.result);
+        // handleUpdateUserAvatar(e.target.result);
       };
       reader.readAsDataURL(selectedFile);
       handleUpload(selectedFile)
@@ -93,6 +93,7 @@ const SettingsPopup = ({
   // Mutation for upload and update user's avatar
   const updateAvatarMutation = useMutation(uploadImage, {
     onSuccess: async (fileId) => {
+      handleUpdateUserAvatar(fileId)
       await updateUserAvatar(fileId);
       queryClient.invalidateQueries('user');
       alert('Avatar updated successfully!');
