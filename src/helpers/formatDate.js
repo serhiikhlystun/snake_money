@@ -3,7 +3,7 @@ import { format, isToday, isYesterday ,isWithinInterval, subDays } from "date-fn
 const formatDate = (date) => {
   
   const now = new Date();
-  const oneWeekAgo = subDays(now, 7);
+  const oneWeekAgo = subDays(now, 6);
 
   if (isToday(date)) {
     return `Today, ${format(date, "p")}`;

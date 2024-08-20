@@ -49,7 +49,6 @@ function App() {
   const [chatPopupOpen, setChatPopupOpen] = useState(false);
   const [authPopupOpen, setAuthPopupOpen] = useState(false);
   const [updatedUserInfo, setUpdatedUserInfo] = useState({});
-  const [userAvatar, setUserAvatar] = useState("");
   const [usersSubscriptionData, setUsersSubscriptionData] = useState();
   const [messagesSubscriptionData, setMessagesSubscriptionData] = useState();
   const [chatsSubscriptionData, setChatsSubscriptionData] = useState();

@@ -14,6 +14,7 @@ import {
   getSearchedUsers,
   updateLastMessage,
   getOneToOneChat,
+  getChatParticipants,
 } from "@/app/queries/chatQueries";
 import { useMutation, useQuery } from "react-query";
 import setData from "@/helpers/setData";
@@ -30,19 +31,28 @@ import favicon from "./../../../public/img/favicon.png";
 const assetsUrl = process.env.NEXT_PUBLIC_ASSETS_URL;
 
 async function handleUsersFiltering({ queryKey }) {
-
   let variables = {};
+  
   if (queryKey[1]) {
     variables = {
       value: queryKey[1],
     };
     const data = await fetchData(getSearchedUsers, { variables }, "/system", queryKey[2]);
-    return data.data.users
+    return data.data.users;
   }
-  if (queryKey[3]) {
+  if (queryKey[3] && queryKey[3].length) {
     variables = { userId: queryKey[3] };
     const data = await fetchData(getUsers, { variables }, "/system", queryKey[2]);
-    return data.data.users
+    return data.data.users;
+  }
+}
+
+async function handleChatParticipants({ queryKey }) {
+  let variables = {};
+  if (queryKey[1]) {
+    variables = { userId: queryKey[1] };
+    const data = await fetchData(getChatParticipants, { variables }, "", queryKey[2]);
+    return data.data.chat_participants;
   }
 }
 
@@ -66,17 +76,28 @@ const ChatPopup = ({
   const [receivedMessage, setReceivedMessage] = useState();
   const [lastMessage, setLastMessage] = useState({});
   const [changedUserStatus, setChangedUserStatus] = useState();
+  const [usersArray, setUsersArray] = useState([]);
+  const [newUserOneToOneChat, setNewUserOneToOneChat] = useState({})
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   // Queries
-  const { data: users, isSuccess: isUsersSuccess } = useQuery(
-    ["users", inputSearchValue, token, user?.id],
-    handleUsersFiltering,
+  const { data: chatsParticipants, isSuccess: chatsParticipantsIsSuccess } = useQuery(
+    ["chat_participants", user?.id, token],
+    handleChatParticipants,
     {
       enabled: !!user,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  const { data: users, isSuccess: isUsersSuccess } = useQuery(
+    ["users", inputSearchValue, token, usersArray],
+    handleUsersFiltering,
+    {
+      enabled: chatsParticipantsIsSuccess,
       refetchOnWindowFocus: false,
     }
   );
@@ -111,22 +132,42 @@ const ChatPopup = ({
   const createOneToOneChatParticipantsMutation = useMutation((user_id) => {
     setData(createChatParticipants, { chatId: newChatId, userId: user_id }, "", token);
     setData(createChatParticipants, { chatId: newChatId, userId: user.id }, "", token);
-  });  
+  });
 
   // UseEffect calls
   useEffect(() => {
-    if (isUsersSuccess && users) {
-      setPeople(sortArrayByLastAccess(users));
+    if (chatsParticipants && user) {
+      let arr = [];
+      chatsParticipants.forEach((item) => {
+        let user_id = item.chat_id.user_1.id;
+        let user2_id = item.chat_id.user_2.id;
+        if (item.chat_id.user_1.id !== user.id) {
+          arr.includes(user_id) ? null : arr.push(user_id);
+        }
+        if (item.chat_id.user_2.id !== user.id) {
+          arr.includes(user2_id) ? null : arr.push(user2_id);
+        }
+        setUsersArray(arr);
+      });
     }
+  }, [chatsParticipants, user]);
+
+  useEffect(()=>{
     if (isGroupChatsSuccess) {
       setGroups(sortArrayByDateUpdate(groupChats));
     }
-  }, [users, isUsersSuccess, groupChats, isGroupChatsSuccess]);
+  }, [groupChats, isGroupChatsSuccess])
+
+  useEffect(()=>{
+    if (isUsersSuccess && users) {
+      setPeople(sortArrayByLastAccess(users.filter((item)=>item.id !== user.id)
+      ));
+    }
+  }, [users, isUsersSuccess, user])
 
   useEffect(() => {
     if (newChatId) {
-      createOneToOneChatParticipantsMutation.mutate();
-      newChatId;
+      createOneToOneChatParticipantsMutation.mutate(selectedChat.user2_id);
     }
   }, [newChatId]);
 
@@ -152,7 +193,7 @@ const ChatPopup = ({
   useEffect(() => {
     if (chatsSubscriptionData) {
       const receivedData = chatsSubscriptionData.chats_mutated.data;
-      if (chatsSubscriptionData.chats_mutated.event === "create") {
+      if (chatsSubscriptionData.chats_mutated.event === "create" && receivedData.type === "one_to_one") {
         setNewChatId(receivedData.id);
       }
       if (chatsSubscriptionData.chats_mutated.event === "update") {
@@ -215,6 +256,12 @@ const ChatPopup = ({
     }
   }, [changedUserStatus]);
 
+  useEffect(()=>{
+    if(!inputSearchValue){
+
+    }
+  }, [inputSearchValue])
+
   if (!isOpen) return null;
 
   const handleSendMessage = () => {
@@ -237,18 +284,15 @@ const ChatPopup = ({
     }
   };
 
-  const handleBotResponse = (userMessage) => {
-    setTimeout(() => {
-      const botMessage = {
-        content: `You said: ${userMessage}`,
-        user_created: {
-          first_name: "bot",
-        },
-        date_created: new Date(),
-      };
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-    }, 1000);
-  };
+  const addUser = (newUser) => {
+    // Check if the user with the same id exists
+    const userExists = usersArray.some(id => id === newUser.id);
+    
+    // If the user does not exist, update the state with the new user
+    if (!userExists) {
+      setUsersArray(prevUsers => [...prevUsers, newUser.id]);
+    }
+  };  
 
   // Select chat and get all messages from this chat or create new chat if it does not exist
   const handleSelectChat = async (chat) => {
@@ -278,9 +322,11 @@ const ChatPopup = ({
       const chatMessages = await getData(getChatUsersMessages, "messages", { chatId: chat.id }, token);
       chatMessages.length ? setMessages(sortArrayByDate(chatMessages)) : setMessages([]);
     } else {
+      setInputSearchValue('');
       if (!isPersonalChat.length) {
+        addUser(chat)
         createOneToOneChatMutation.mutate({
-          username: chat.first_name,
+          username: `${chat.first_name}/${user.first_name}`,
           user1: user.id,
           user2: chat.id,
         });

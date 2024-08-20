@@ -111,14 +111,26 @@ export const chatsSubscription = `
                 type
                 chat_name
                 last_message
+                user_1 {
+                    id
+                    first_name
+                    email
+                    is_online
+                }
+                user_2 {
+                    id
+                    first_name
+                    email
+                    is_online
+                }
             }
         }
     }
 `;
 
 export const getUsers = `
-    query Users ($userId: String) {
-        users(filter: { id: { _neq: $userId } }) {
+    query Users ($userId: [String]) {
+        users(filter: { id: { _in: $userId } }) {
             id
             first_name
             last_name
@@ -229,12 +241,41 @@ export const usersSubscription = `
 
 export const userOnlineMutated = `
     mutation Update_users_item ($userId: ID!, $isOnline: Boolean){
-    update_users_item(id: $userId, data: { is_online: $isOnline }) {
+        update_users_item(id: $userId, data: { is_online: $isOnline }) {
+            id
+            first_name
+            last_name
+            email
+            is_online
+        }
+    }
+`
+export const getChatParticipants = `
+    query Chat_participants ($userId: String) {
+    chat_participants(filter: { user_id: { id: { _eq: $userId } } chat_id: { type: { _eq: "one_to_one" } }}) {
         id
-        first_name
-        last_name
-        email
-        is_online
+        status
+        sort
+        date_created
+        date_updated
+        chat_id {
+            id
+            type
+            chat_name
+            last_message
+            user_1 {
+                id
+                first_name
+                email
+                is_online
+            }
+            user_2 {
+                id
+                first_name
+                email
+                is_online
+            }
+        }
     }
 }
 `
